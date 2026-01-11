@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -94,14 +94,54 @@ def test_orpo_train_method(base_manifest: TrainingManifest) -> None:
     assert result["strategy"] == "orpo"
 
 
-def test_qlora_validation_warning(base_manifest: TrainingManifest, caplog: pytest.LogCaptureFixture) -> None:
+def test_qlora_validation_warning_captured(base_manifest: TrainingManifest, caplog: pytest.LogCaptureFixture) -> None:
+    """Test that QLoRA validation correctly logs a warning for non-4bit quantization."""
     base_manifest.method_config.type = MethodType.QLORA
     base_manifest.compute.quantization = "8bit"  # Not 4bit
 
-    StrategyFactory.get_strategy(base_manifest)
+    # We need to capture logs from the specific logger name
+    # Since we use loguru, we need to make sure loguru propagates to python's standard logging
+    # OR use a specific fixture for loguru.
+    # However, 'caplog' fixture in pytest captures standard logging.
+    # Loguru has a `PropagateHandler` or similar to feed into standard logging.
+    # A simpler way for loguru testing is using the `caplog` fixture if loguru is configured to intercept.
 
-    # Check if the warning was captured in stderr or via caplog mechanism
-    # Depending on how loguru is set up with pytest, it might need specific handling.
-    # But since we saw the output in stderr call, we know it's working.
-    # We might need to configure loguru to sink to caplog handler during tests.
-    pass
+    # As of now, `src/utils/logger.py` uses `logger.add(sys.stderr)`.
+    # This might NOT go to `caplog` automatically.
+    # We can rely on a different approach: verify it doesn't crash,
+    # OR mock the logger.
+
+    with patch("coreason_model_foundry.strategies.qlora.logger") as mock_logger:
+        StrategyFactory.get_strategy(base_manifest)
+        mock_logger.warning.assert_called_once()
+        assert "QLoRA usually requires 4bit quantization" in mock_logger.warning.call_args[0][0]
+
+
+def test_validate_is_called_during_factory_creation(base_manifest: TrainingManifest) -> None:
+    """Verify that the factory calls .validate() on the strategy."""
+    base_manifest.method_config.type = MethodType.QLORA
+
+    # We patch the QLoRAStrategy class specifically to spy on its `validate` method
+    with patch.object(QLoRAStrategy, "validate", autospec=True) as mock_validate:
+        strategy = StrategyFactory.get_strategy(base_manifest)
+        mock_validate.assert_called_once_with(strategy)
+
+
+def test_strategy_isolation(base_manifest: TrainingManifest) -> None:
+    """Verify that strategies created by the factory are independent instances."""
+    base_manifest.method_config.type = MethodType.QLORA
+
+    strategy_1 = StrategyFactory.get_strategy(base_manifest)
+    strategy_2 = StrategyFactory.get_strategy(base_manifest)
+
+    assert strategy_1 is not strategy_2
+    assert strategy_1.manifest is strategy_2.manifest  # Same manifest object passed in
+
+    # Modify manifest for second strategy
+    # If we create a new manifest, they should be different
+    manifest_2 = base_manifest.model_copy(deep=True)
+    manifest_2.job_id = "job-2"
+    strategy_3 = StrategyFactory.get_strategy(manifest_2)
+
+    assert strategy_3.manifest.job_id == "job-2"
+    assert strategy_1.manifest.job_id == "test-job-1"
