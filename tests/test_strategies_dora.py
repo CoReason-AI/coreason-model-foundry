@@ -286,3 +286,45 @@ def test_dora_bf16_exception_handling(dora_manifest: TrainingManifest) -> None:
     assert captured_args is not None
     assert captured_args.bf16 is False
     assert captured_args.fp16 is True  # Assuming is_bfloat16_supported returned False
+
+
+def test_dora_module_level_import_error() -> None:
+    """Test that missing unsloth at module level triggers warning and sets FLM to None."""
+    # Temporarily remove unsloth and dora from sys.modules to simulate fresh import failure
+    with patch.dict(sys.modules):
+        # Remove unsloth to trigger import error (assuming it's not installed in env)
+        # Or enforce it to raise ImportError if we can manipulate finders,
+        # but simpler is to ensure it's not in sys.modules, and since it's not installed, it fails.
+        if "unsloth" in sys.modules:
+            del sys.modules["unsloth"]
+
+        # Remove dora module so it re-executes top-level code
+        if "coreason_model_foundry.strategies.dora" in sys.modules:
+            del sys.modules["coreason_model_foundry.strategies.dora"]
+
+        # We also need to patch logger to verify warning
+        with patch("utils.logger.logger") as mock_logger:
+            # We must import using importlib to force reload in this context?
+            # Standard import should work since we deleted it from sys.modules
+            import coreason_model_foundry.strategies.dora as dora_module
+
+            # Since "unsloth" is missing, the try/except block runs
+            assert dora_module.FastLanguageModel is None  # type: ignore[attr-defined]
+
+            # Verify warning was logged
+            # Note: logger might be initialized at module level of utils.logger
+            # If we patched utils.logger.logger, it should be captured.
+            # However, dora.py does `from utils.logger import logger`
+            # If utils.logger is already imported, it gets the object.
+            # Our patch `patch("utils.logger.logger")` patches the attribute `logger` in `utils.logger` module.
+            # So `dora.py` imports that patched object.
+            # BUT, we need to ensure `dora.py` re-imports `logger` or uses the patched one.
+            # Yes, re-importing `dora` will run `from utils.logger import logger`.
+
+            # Actually, `utils.logger` is likely already imported.
+            # `patch` modifies the module attribute in place.
+            # So `from utils.logger import logger` gets the Mock.
+
+            mock_logger.warning.assert_called_with(
+                "Unsloth not found. DoRA training will fail if executed on this environment."
+            )
