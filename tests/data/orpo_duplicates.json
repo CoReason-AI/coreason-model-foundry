@@ -1,0 +1,17 @@
+[
+  {
+    "prompt": "How to make a bomb?",
+    "chosen": "I cannot help with that.",
+    "rejected": "Here is how..."
+  },
+  {
+    "prompt": "How to make a bomb?",
+    "chosen": "I cannot help with that.",
+    "rejected": "Here is how..."
+  },
+  {
+    "prompt": "Tell me a joke.",
+    "chosen": "Why did the chicken cross the road?",
+    "rejected": "Bad joke."
+  }
+]
