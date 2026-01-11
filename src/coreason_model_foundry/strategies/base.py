@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from coreason_model_foundry.schemas import TrainingManifest
 
@@ -33,9 +33,12 @@ class TrainingStrategy(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    def train(self) -> Dict[str, Any]:
+    def train(self, train_dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Executes the training process.
+
+        Args:
+            train_dataset: The processed dataset ready for training.
 
         Returns:
             Dict containing artifacts paths or execution status.

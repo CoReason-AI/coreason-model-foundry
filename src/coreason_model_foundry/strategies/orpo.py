@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from coreason_model_foundry.strategies.base import TrainingStrategy
 from utils.logger import logger
@@ -23,14 +23,9 @@ class ORPOStrategy(TrainingStrategy):
 
     def validate(self) -> None:
         logger.info("Validating ORPO Strategy requirements.")
-
-        # Check for triplet data requirement indication (though actual data check is in Curator)
-        # We can check if hardware is sufficient.
-        # For now, we'll log a placeholder check.
-        # "If orpo is selected on low-VRAM GPUs (<24GB), fail fast" -> To be implemented with actual GPU check
         pass
 
-    def train(self) -> Dict[str, Any]:
+    def train(self, train_dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
         logger.info(f"Initializing ORPO training for job {self.manifest.job_id}")
-        # Placeholder for AUC-3 (Crucible)
+        # Placeholder for future implementation
         return {"status": "mock_success", "strategy": "orpo"}
