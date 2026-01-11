@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
 import sys
-from typing import Dict, Generator, List
+from typing import Any, Dict, Generator, List
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -151,3 +151,87 @@ def test_dora_missing_unsloth(dora_manifest: TrainingManifest) -> None:
 
         with pytest.raises(RuntimeError, match="Unsloth is required"):
             strategy.validate()
+
+
+def test_dora_formatting_logic(dora_manifest: TrainingManifest) -> None:
+    """Test the internal formatting function robustly handles edge cases."""
+    from coreason_model_foundry.strategies.dora import DoRAStrategy
+
+    mock_tokenizer = MagicMock()
+    mock_tokenizer.eos_token = "<|eos|>"
+
+    # Capture the formatting function
+    captured_formatting_func = None
+
+    def capture_trainer(*args: Any, **kwargs: Any) -> MagicMock:
+        nonlocal captured_formatting_func
+        captured_formatting_func = kwargs.get("formatting_func")
+        return MagicMock()
+
+    with (
+        patch("coreason_model_foundry.strategies.dora.FastLanguageModel") as MockFLM,
+        patch("coreason_model_foundry.strategies.dora.SFTTrainer", side_effect=capture_trainer),
+        patch("coreason_model_foundry.strategies.dora.Dataset"),
+    ):
+        MockFLM.from_pretrained.return_value = (MagicMock(), mock_tokenizer)
+
+        strategy = DoRAStrategy(dora_manifest)
+        strategy.validate()
+        # Pass dummy data, we only care about extracting the function
+        strategy.train([{"instruction": "a", "input": "b", "output": "c"}])
+
+    assert captured_formatting_func is not None
+
+    # Test Case 1: Standard Input
+    batch = {"instruction": ["Do this"], "input": ["With this"], "output": ["Result"]}
+    result = captured_formatting_func(batch)
+    assert "### Instruction:\nDo this" in result[0]
+    assert "### Input:\nWith this" in result[0]
+    assert "### Response:\nResult" in result[0]
+    assert result[0].endswith("<|eos|>")
+
+    # Test Case 2: None Values (Edge Case)
+    batch_none = {"instruction": [None], "input": [None], "output": [None]}
+    result_none = captured_formatting_func(batch_none)
+    # Should not crash and replace None with empty string
+    assert "### Instruction:\n\n" in result_none[0]
+    assert "### Input:\n\n" in result_none[0]
+
+
+def test_dora_bf16_enabled(dora_manifest: TrainingManifest) -> None:
+    """Test that BF16 is enabled when supported by hardware (mocked)."""
+    from coreason_model_foundry.strategies.dora import DoRAStrategy
+
+    # Mock torch.cuda.is_available and is_bf16_supported
+    # We need to mock 'torch' inside 'dora.py' scope specifically for the helper function
+    # The helper `is_bfloat16_supported` imports torch inside.
+    # So we patch sys.modules["torch"] which is already done by global fixture,
+    # but we need to configure it to return True for bf16.
+
+    # Access the global mock from sys.modules
+    mock_torch = sys.modules["torch"]
+    mock_torch.cuda.is_available.return_value = True
+    mock_torch.cuda.is_bf16_supported.return_value = True
+
+    captured_args = None
+
+    def capture_trainer(*args: Any, **kwargs: Any) -> MagicMock:
+        nonlocal captured_args
+        captured_args = kwargs.get("args")
+        return MagicMock()
+
+    with (
+        patch("coreason_model_foundry.strategies.dora.FastLanguageModel") as MockFLM,
+        patch("coreason_model_foundry.strategies.dora.SFTTrainer", side_effect=capture_trainer),
+        patch("coreason_model_foundry.strategies.dora.Dataset"),
+    ):
+        MockFLM.from_pretrained.return_value = (MagicMock(), MagicMock())
+        MockFLM.get_peft_model.return_value = MagicMock()
+
+        strategy = DoRAStrategy(dora_manifest)
+        strategy.validate()
+        strategy.train([{"instruction": "a", "input": "b", "output": "c"}])
+
+    assert captured_args is not None
+    assert captured_args.bf16 is True
+    assert captured_args.fp16 is False

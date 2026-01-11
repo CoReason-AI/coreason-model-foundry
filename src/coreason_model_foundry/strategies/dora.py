@@ -114,17 +114,22 @@ class DoRAStrategy(TrainingStrategy):
             outputs = examples["output"]
             texts = []
             for instruction, input, output in zip(instructions, inputs, outputs, strict=False):
+                # Handle None/Missing values gracefully
+                instr_val = instruction if instruction is not None else ""
+                input_val = input if input is not None else ""
+                output_val = output if output is not None else ""
+
                 # Standard Alpaca/Llama format or similar.
                 # For simplicity, we assume a generic format here.
                 text = (
                     f"""### Instruction:
-{instruction}
+{instr_val}
 
 ### Input:
-{input}
+{input_val}
 
 ### Response:
-{output}"""
+{output_val}"""
                     + tokenizer.eos_token
                 )
                 texts.append(text)
