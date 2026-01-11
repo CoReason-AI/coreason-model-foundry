@@ -8,6 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -168,3 +169,14 @@ def test_main_cli(mock_orchestrate: MagicMock) -> None:
         main()
 
     mock_orchestrate.assert_called_once_with("config.yaml")
+
+
+def test_main_module_execution() -> None:
+    """Verify that the module can be executed as a script (covers if __name__ == '__main__')."""
+    # We use subprocess to run the module with --help.
+    # This ensures the if __name__ == "__main__": block is hit.
+    result = subprocess.run(
+        [sys.executable, "-m", "coreason_model_foundry.main", "--help"], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0
+    assert "usage:" in result.stdout
