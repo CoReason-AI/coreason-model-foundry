@@ -8,6 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +18,7 @@ import yaml
 from coreason_model_foundry.main import (
     calculate_provenance_id,
     load_manifest,
+    main,
     orchestrate_training,
 )
 from coreason_model_foundry.schemas import TrainingManifest
@@ -80,6 +82,26 @@ def test_calculate_provenance_id() -> None:
     assert len(pid1) == 64  # SHA256 hex digest length
 
 
+def test_calculate_provenance_id_sensitivity() -> None:
+    """Complex Scenario: Verify hash sensitivity to changes."""
+    manifest_a = MagicMock()
+    manifest_a.model_dump_json.return_value = '{"job": "1"}'
+
+    manifest_b = MagicMock()
+    manifest_b.model_dump_json.return_value = '{"job": "2"}'
+
+    dataset_a = [{"data": "1"}]
+    dataset_b = [{"data": "2"}]
+
+    pid_aa = calculate_provenance_id(manifest_a, dataset_a)
+    pid_ab = calculate_provenance_id(manifest_a, dataset_b)
+    pid_ba = calculate_provenance_id(manifest_b, dataset_a)
+
+    assert pid_aa != pid_ab, "Hash should change if dataset changes"
+    assert pid_aa != pid_ba, "Hash should change if manifest changes"
+    assert pid_ab != pid_ba
+
+
 @patch("coreason_model_foundry.main.Curator")
 @patch("coreason_model_foundry.main.StrategyFactory")
 @patch("coreason_model_foundry.main.load_manifest")
@@ -114,11 +136,35 @@ def test_orchestrate_training_flow(mock_load: MagicMock, mock_factory: MagicMock
     mock_factory.get_strategy.assert_called_once_with(mock_manifest)
     mock_strategy.train.assert_called_once()
 
-    # Verify provenance calculation was implicit (hard to check without mocking the helper, but flow suggests it ran)
+
+@patch("coreason_model_foundry.main.Curator")
+@patch("coreason_model_foundry.main.load_manifest")
+def test_orchestrate_training_empty_dataset(mock_load: MagicMock, mock_curator_cls: MagicMock) -> None:
+    # Setup
+    mock_load.return_value = MagicMock()
+    mock_curator_instance = mock_curator_cls.return_value
+    mock_curator_instance.prepare_dataset.return_value = []  # Empty dataset
+
+    # Expect SystemExit(1)
+    with pytest.raises(SystemExit) as exc:
+        orchestrate_training("dummy.yaml")
+
+    assert exc.value.code == 1
 
 
 @patch("coreason_model_foundry.main.load_manifest")
-def test_orchestrate_training_empty_dataset(mock_load: MagicMock) -> None:
-    # If dataset is empty, what happens? Ideally strategy might raise error or we catch it before.
-    # The Curator returns empty list.
-    pass  # Implementation dependent, but good to think about.
+def test_orchestrate_training_exception(mock_load: MagicMock) -> None:
+    # Simulate an error during manifest loading
+    mock_load.side_effect = ValueError("Critical Failure")
+
+    with pytest.raises(ValueError, match="Critical Failure"):
+        orchestrate_training("dummy.yaml")
+
+
+@patch("coreason_model_foundry.main.orchestrate_training")
+def test_main_cli(mock_orchestrate: MagicMock) -> None:
+    test_args = ["main.py", "--manifest", "config.yaml"]
+    with patch.object(sys, "argv", test_args):
+        main()
+
+    mock_orchestrate.assert_called_once_with("config.yaml")
