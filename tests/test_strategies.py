@@ -8,6 +8,8 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
+import sys
+from typing import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -26,6 +28,24 @@ from coreason_model_foundry.strategies import (
     StrategyFactory,
     TrainingStrategy,
 )
+
+
+@pytest.fixture(autouse=True)
+def global_mocks() -> Generator[None, None, None]:
+    """Ensure heavy dependencies are mocked for all tests in this file."""
+    with patch.dict(
+        sys.modules,
+        {
+            "unsloth": MagicMock(),
+            "trl": MagicMock(),
+            "datasets": MagicMock(),
+            "transformers": MagicMock(),
+            "torch": MagicMock(),
+        },
+    ):
+        # Specifically ensure Unsloth mock has the required attribute for DoRA
+        sys.modules["unsloth"].FastLanguageModel = MagicMock()  # type: ignore
+        yield
 
 
 @pytest.fixture
@@ -49,8 +69,14 @@ def test_factory_creates_qlora(base_manifest: TrainingManifest) -> None:
 
 def test_factory_creates_dora(base_manifest: TrainingManifest) -> None:
     base_manifest.method_config.type = MethodType.DORA
-    strategy = StrategyFactory.get_strategy(base_manifest)
-    assert isinstance(strategy, DoRAStrategy)
+
+    # We must patch the validate method because DoRAStrategy.validate checks for unsloth
+    # even if we mocked it, the `dora.py` might have loaded with FastLanguageModel=None
+    # if unsloth wasn't in sys.modules at import time.
+    # To be safe, we mock validate.
+    with patch("coreason_model_foundry.strategies.dora.DoRAStrategy.validate"):
+        strategy = StrategyFactory.get_strategy(base_manifest)
+        assert isinstance(strategy, DoRAStrategy)
 
 
 def test_factory_creates_orpo(base_manifest: TrainingManifest) -> None:
@@ -74,43 +100,47 @@ def test_strategies_have_validate_and_train_methods(base_manifest: TrainingManif
     assert hasattr(strategy, "train")
 
     # Test basic return of train (mocked) for QLoRA
-    result = strategy.train()
+    result = strategy.train([{}])  # Pass empty list of dicts
     assert result["status"] == "mock_success"
 
 
 def test_dora_train_method(base_manifest: TrainingManifest) -> None:
     base_manifest.method_config.type = MethodType.DORA
-    strategy = StrategyFactory.get_strategy(base_manifest)
-    result = strategy.train()
-    assert result["status"] == "mock_success"
-    assert result["strategy"] == "dora"
+
+    # We need to ensure DoRA can run.
+    # If unsloth is missing, validate fails.
+    # We can patch validate or patch the module attribute.
+
+    with (
+        patch("coreason_model_foundry.strategies.dora.DoRAStrategy.validate"),
+        patch("coreason_model_foundry.strategies.dora.FastLanguageModel") as mock_flm,
+        patch("coreason_model_foundry.strategies.dora.SFTTrainer"),
+        patch("coreason_model_foundry.strategies.dora.Dataset") as mock_dataset,
+    ):
+        mock_flm.from_pretrained.return_value = (MagicMock(), MagicMock())
+        mock_flm.get_peft_model.return_value = MagicMock()
+        mock_dataset.from_list.return_value = MagicMock()
+
+        strategy = StrategyFactory.get_strategy(base_manifest)
+        result = strategy.train([{"instruction": "i", "input": "i", "output": "o"}])
+        assert result["status"] == "success"
+        assert result["strategy"] == "dora"
 
 
 def test_orpo_train_method(base_manifest: TrainingManifest) -> None:
     base_manifest.method_config.type = MethodType.ORPO
     strategy = StrategyFactory.get_strategy(base_manifest)
-    result = strategy.train()
+    result = strategy.train([{}])
     assert result["status"] == "mock_success"
     assert result["strategy"] == "orpo"
 
 
-def test_qlora_validation_warning_captured(base_manifest: TrainingManifest, caplog: pytest.LogCaptureFixture) -> None:
+def test_qlora_validation_warning_captured(base_manifest: TrainingManifest) -> None:
     """Test that QLoRA validation correctly logs a warning for non-4bit quantization."""
     base_manifest.method_config.type = MethodType.QLORA
     base_manifest.compute.quantization = "8bit"  # Not 4bit
 
-    # We need to capture logs from the specific logger name
-    # Since we use loguru, we need to make sure loguru propagates to python's standard logging
-    # OR use a specific fixture for loguru.
-    # However, 'caplog' fixture in pytest captures standard logging.
-    # Loguru has a `PropagateHandler` or similar to feed into standard logging.
-    # A simpler way for loguru testing is using the `caplog` fixture if loguru is configured to intercept.
-
-    # As of now, `src/utils/logger.py` uses `logger.add(sys.stderr)`.
-    # This might NOT go to `caplog` automatically.
-    # We can rely on a different approach: verify it doesn't crash,
-    # OR mock the logger.
-
+    # Now that QLoRA imports logger, we can patch it
     with patch("coreason_model_foundry.strategies.qlora.logger") as mock_logger:
         StrategyFactory.get_strategy(base_manifest)
         mock_logger.warning.assert_called_once()
