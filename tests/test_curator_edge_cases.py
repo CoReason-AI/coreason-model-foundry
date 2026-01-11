@@ -185,6 +185,13 @@ def test_formatter_unknown_method() -> None:
         DataFormatter.format_and_validate(data, "UNKNOWN_METHOD")  # type: ignore
 
 
+def test_formatter_orpo_invalid() -> None:
+    """Test missing keys validation for ORPO."""
+    data = [{"prompt": "p", "chosen": "c"}]  # Missing 'rejected'
+    with pytest.raises(ValueError, match="missing required keys for ORPO"):
+        DataFormatter.format_and_validate(data, MethodType.ORPO)
+
+
 # --- SemDeDup Edge Cases ---
 
 
