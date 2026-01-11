@@ -235,3 +235,54 @@ def test_dora_bf16_enabled(dora_manifest: TrainingManifest) -> None:
     assert captured_args is not None
     assert captured_args.bf16 is True
     assert captured_args.fp16 is False
+
+
+def test_dora_train_missing_unsloth_runtime_error(
+    dora_manifest: TrainingManifest, sample_dataset: List[Dict[str, str]]
+) -> None:
+    """Test that runtime error is raised if Unsloth is missing during train execution."""
+    from coreason_model_foundry.strategies.dora import DoRAStrategy
+
+    with patch("coreason_model_foundry.strategies.dora.FastLanguageModel", None):
+        strategy = DoRAStrategy(dora_manifest)
+        # We manually bypass validate to trigger error in train
+        # or we assume validate passes but something happened to unsloth module
+        # This covers the defensive check inside `train()`
+        with pytest.raises(RuntimeError, match="Unsloth is required"):
+            strategy.train(sample_dataset)
+
+
+def test_dora_bf16_exception_handling(dora_manifest: TrainingManifest) -> None:
+    """Test that exception handling in is_bfloat16_supported works."""
+    from coreason_model_foundry.strategies.dora import DoRAStrategy
+
+    # Access global mock
+    mock_torch = sys.modules["torch"]
+    # Force exception when checking cuda availability
+    mock_torch.cuda.is_available.side_effect = Exception("CUDA Error")
+
+    captured_args = None
+
+    def capture_trainer(*args: Any, **kwargs: Any) -> MagicMock:
+        nonlocal captured_args
+        captured_args = kwargs.get("args")
+        return MagicMock()
+
+    with (
+        patch("coreason_model_foundry.strategies.dora.FastLanguageModel") as MockFLM,
+        patch("coreason_model_foundry.strategies.dora.SFTTrainer", side_effect=capture_trainer),
+        patch("coreason_model_foundry.strategies.dora.Dataset"),
+    ):
+        MockFLM.from_pretrained.return_value = (MagicMock(), MagicMock())
+        MockFLM.get_peft_model.return_value = MagicMock()
+
+        strategy = DoRAStrategy(dora_manifest)
+        strategy.validate()
+        strategy.train([{"instruction": "a", "input": "b", "output": "c"}])
+
+    # Reset side effect for other tests
+    mock_torch.cuda.is_available.side_effect = None
+
+    assert captured_args is not None
+    assert captured_args.bf16 is False
+    assert captured_args.fp16 is True  # Assuming is_bfloat16_supported returned False
