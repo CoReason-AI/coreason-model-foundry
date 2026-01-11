@@ -10,7 +10,7 @@
 
 from pathlib import Path
 
-from coreason_model_foundry.utils.logger import logger
+from utils.logger import logger
 
 
 def test_logger_initialization() -> None:

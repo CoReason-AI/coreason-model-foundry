@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
-from coreason_model_foundry.utils.logger import logger
+from utils.logger import logger
 
 
 def hello_world() -> str:
