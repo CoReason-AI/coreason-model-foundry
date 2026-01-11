@@ -30,7 +30,7 @@ class TrainingStrategy(ABC):
         Validates if the current environment and manifest are suitable for this strategy.
         Raises exceptions if constraints are not met.
         """
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def train(self) -> Dict[str, Any]:
@@ -40,4 +40,4 @@ class TrainingStrategy(ABC):
         Returns:
             Dict containing artifacts paths or execution status.
         """
-        pass
+        pass  # pragma: no cover

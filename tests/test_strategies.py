@@ -8,6 +8,8 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from coreason_model_foundry.schemas import (
@@ -58,15 +60,12 @@ def test_factory_creates_orpo(base_manifest: TrainingManifest) -> None:
 
 
 def test_factory_validation_error_unknown_type(base_manifest: TrainingManifest) -> None:
-    # This is slightly tricky because Pydantic enforces the enum.
-    # We force it by bypassing pydantic validation if possible or creating a mock
-    # simpler way: just test that StrategyFactory handles what it gets.
-    # If we manually inject a bad type into the object (not via constructor)
+    # Mock the manifest to return an invalid type that isn't in the registry
+    mock_manifest = MagicMock()
+    mock_manifest.method_config.type = "INVALID_TYPE"
 
-    # Actually, we can just assert that providing a valid Enum not in registry raises error
-    # But all Enums are in registry.
-    # Let's mock the manifest to return a garbage string for type
-    pass
+    with pytest.raises(ValueError, match="Unsupported training method"):
+        StrategyFactory.get_strategy(mock_manifest)
 
 
 def test_strategies_have_validate_and_train_methods(base_manifest: TrainingManifest) -> None:
@@ -74,9 +73,25 @@ def test_strategies_have_validate_and_train_methods(base_manifest: TrainingManif
     assert hasattr(strategy, "validate")
     assert hasattr(strategy, "train")
 
-    # Test basic return of train (mocked)
+    # Test basic return of train (mocked) for QLoRA
     result = strategy.train()
     assert result["status"] == "mock_success"
+
+
+def test_dora_train_method(base_manifest: TrainingManifest) -> None:
+    base_manifest.method_config.type = MethodType.DORA
+    strategy = StrategyFactory.get_strategy(base_manifest)
+    result = strategy.train()
+    assert result["status"] == "mock_success"
+    assert result["strategy"] == "dora"
+
+
+def test_orpo_train_method(base_manifest: TrainingManifest) -> None:
+    base_manifest.method_config.type = MethodType.ORPO
+    strategy = StrategyFactory.get_strategy(base_manifest)
+    result = strategy.train()
+    assert result["status"] == "mock_success"
+    assert result["strategy"] == "orpo"
 
 
 def test_qlora_validation_warning(base_manifest: TrainingManifest, caplog: pytest.LogCaptureFixture) -> None:
