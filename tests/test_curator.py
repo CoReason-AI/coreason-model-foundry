@@ -29,7 +29,13 @@ def base_manifest() -> TrainingManifest:
     return TrainingManifest(
         job_id="test-curator-job",
         base_model="test-model",
-        method_config=MethodConfig(type=MethodType.DORA, rank=16, alpha=32, target_modules=["q_proj"]),
+        method_config=MethodConfig(
+            type=MethodType.DORA,
+            rank=16,
+            alpha=32,
+            target_modules=["q_proj"],
+            strict_hardware_check=False,
+        ),
         dataset=DatasetConfig(ref="synthesis://tests/data/duplicates.json", sem_dedup=True, dedup_threshold=0.99),
         compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024),
     )

@@ -71,13 +71,15 @@ class ORPOStrategy(TrainingStrategy):
 
                 strict_check = getattr(self.manifest.method_config, "strict_hardware_check", True)
 
-                # PRD: If VRAM < 24GB: Fail Fast (unless allow_gradient_checkpointing is forced, which implies strict_check=False)
+                # PRD: If VRAM < 24GB: Fail Fast
+                # (unless allow_gradient_checkpointing is forced, which implies strict_check=False)
                 if total_memory_gb < self.MIN_VRAM_GB:
                     if strict_check:
-                        raise RuntimeError(
-                            f"Insufficient VRAM for ORPO. Detected {total_memory_gb:.2f}GB, required {self.MIN_VRAM_GB}GB. "
-                            "Upgrade node or disable strict hardware checks."
+                        msg = (
+                            f"Insufficient VRAM for ORPO. Detected {total_memory_gb:.2f}GB, required "
+                            f"{self.MIN_VRAM_GB}GB. Upgrade node or disable strict hardware checks."
                         )
+                        raise RuntimeError(msg)
                     else:
                         logger.warning(
                             f"VRAM {total_memory_gb:.2f}GB is below recommended {self.MIN_VRAM_GB}GB for ORPO. "
@@ -199,6 +201,7 @@ def is_bfloat16_supported() -> bool:
     try:
         import torch
 
-        return torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+        # Cast to bool explicitly to satisfy Mypy
+        return bool(torch.cuda.is_available() and torch.cuda.is_bf16_supported())
     except Exception:
         return False

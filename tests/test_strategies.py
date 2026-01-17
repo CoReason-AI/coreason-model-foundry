@@ -53,7 +53,13 @@ def base_manifest() -> TrainingManifest:
     return TrainingManifest(
         job_id="test-job-1",
         base_model="test-model",
-        method_config=MethodConfig(type=MethodType.QLORA, rank=16, alpha=32, target_modules=["q_proj"]),
+        method_config=MethodConfig(
+            type=MethodType.QLORA,
+            rank=16,
+            alpha=32,
+            target_modules=["q_proj"],
+            strict_hardware_check=False,
+        ),
         dataset=DatasetConfig(ref="test-dataset", dedup_threshold=0.95),
         compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024, quantization="4bit"),
     )

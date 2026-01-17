@@ -247,7 +247,13 @@ def test_curator_complex_dirty_dataset(dirty_dataset_path: str) -> None:
     manifest = TrainingManifest(
         job_id="complex-job",
         base_model="test-model",
-        method_config=MethodConfig(type=MethodType.DORA, rank=16, alpha=32, target_modules=["all"]),
+        method_config=MethodConfig(
+            type=MethodType.DORA,
+            rank=16,
+            alpha=32,
+            target_modules=["all"],
+            strict_hardware_check=False,
+        ),
         dataset=DatasetConfig(ref=f"synthesis://{dirty_dataset_path}", sem_dedup=True, dedup_threshold=0.95),
         compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024),
     )
