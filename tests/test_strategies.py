@@ -21,15 +21,16 @@ from coreason_model_foundry.schemas import (
     MethodType,
     TrainingManifest,
 )
+
+# Import orpo module explicitly to patch it directly
 from coreason_model_foundry.strategies import (
     DoRAStrategy,
     ORPOStrategy,
     QLoRAStrategy,
     StrategyFactory,
     TrainingStrategy,
+    orpo,
 )
-# Import orpo module explicitly to patch it directly
-from coreason_model_foundry.strategies import orpo
 
 
 @pytest.fixture(autouse=True)
@@ -37,8 +38,10 @@ def global_mocks() -> Generator[None, None, None]:
     """Ensure heavy dependencies are mocked for all tests in this file."""
     # Create a mock torch module with a real class for Tensor so isinstance checks pass
     mock_torch = MagicMock()
+
     class MockTensor:
         pass
+
     mock_torch.Tensor = MockTensor
     mock_torch.cuda.is_available.return_value = True
     mock_torch.cuda.get_device_properties.return_value.total_memory = 25 * (1024**3)
@@ -54,8 +57,8 @@ def global_mocks() -> Generator[None, None, None]:
         },
     ):
         # Specifically ensure Unsloth mock has the required attribute for DoRA/ORPO
-        sys.modules["unsloth"].FastLanguageModel = MagicMock()
-        sys.modules["unsloth"].PatchDPOTrainer = MagicMock()
+        sys.modules["unsloth"].FastLanguageModel = MagicMock()  # type: ignore
+        sys.modules["unsloth"].PatchDPOTrainer = MagicMock()  # type: ignore
         yield
 
 
@@ -65,11 +68,7 @@ def base_manifest() -> TrainingManifest:
         job_id="test-job-1",
         base_model="test-model",
         method_config=MethodConfig(
-            type=MethodType.QLORA,
-            rank=16,
-            alpha=32,
-            target_modules=["q_proj"],
-            strict_hardware_check=False
+            type=MethodType.QLORA, rank=16, alpha=32, target_modules=["q_proj"], strict_hardware_check=False
         ),
         dataset=DatasetConfig(ref="test-dataset", dedup_threshold=0.95),
         compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024, quantization="4bit"),
@@ -98,9 +97,7 @@ def test_factory_creates_orpo(base_manifest: TrainingManifest) -> None:
     base_manifest.method_config.type = MethodType.ORPO
 
     # Use patch.object on the imported module object to be robust against path variations
-    with patch.object(orpo, "FastLanguageModel", MagicMock()), \
-         patch.object(orpo, "torch", sys.modules["torch"]):
-
+    with patch.object(orpo, "FastLanguageModel", MagicMock()), patch.object(orpo, "torch", sys.modules["torch"]):
         strategy = StrategyFactory.get_strategy(base_manifest)
         assert isinstance(strategy, ORPOStrategy)
 
@@ -131,7 +128,7 @@ def test_dora_train_method(base_manifest: TrainingManifest) -> None:
         patch("coreason_model_foundry.strategies.dora.FastLanguageModel") as mock_flm,
         patch("coreason_model_foundry.strategies.dora.SFTTrainer"),
         patch("coreason_model_foundry.strategies.dora.Dataset") as mock_dataset,
-        patch("coreason_model_foundry.strategies.dora.DoRAStrategy.validate"), # Bypass validate if needed
+        patch("coreason_model_foundry.strategies.dora.DoRAStrategy.validate"),  # Bypass validate if needed
     ):
         mock_flm.from_pretrained.return_value = (MagicMock(), MagicMock())
         mock_flm.get_peft_model.return_value = MagicMock()
