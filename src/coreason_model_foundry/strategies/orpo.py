@@ -19,6 +19,7 @@ from transformers import TrainingArguments
 from trl import ORPOTrainer
 
 from coreason_model_foundry.strategies.base import TrainingStrategy
+from coreason_model_foundry.utils.hardware import check_vram_compatibility
 from utils.logger import logger
 
 try:
@@ -42,57 +43,46 @@ class ORPOStrategy(TrainingStrategy):
     """
 
     MIN_VRAM_GB = 24
-    BYTES_PER_GB = 1024**3
+
+    def validate_environment(self) -> None:
+        """
+        Validates hardware constraints for ORPO.
+        Rule: If quantization == 'none' AND vram < 24GB -> Raise EnvironmentError.
+        """
+        logger.info("Validating ORPO Environment...")
+
+        quantization = self.manifest.compute.quantization
+        logger.info(f"Quantization mode: {quantization}")
+
+        # Check if we need to enforce the 24GB limit
+        # "If quantization == 'none' AND vram < 24GB"
+        if quantization == "none":
+            # We assume 'none' means full precision or BF16, which is heavy.
+            # We enforce 24GB VRAM.
+            logger.info(f"Full precision (quantization='none') detected. Enforcing {self.MIN_VRAM_GB}GB VRAM check.")
+            check_vram_compatibility(required_gb=self.MIN_VRAM_GB)
+        else:
+            # For 4bit/8bit, we might be more lenient, or strict check applies differently.
+            # The user instruction was specific to quantization == 'none'.
+            # However, we can still run a check if strict hardware check is enabled?
+            # For now, we only enforce what was requested to avoid regression on other configs.
+            pass
 
     def validate(self) -> None:
         """
-        Validates hardware constraints for ORPO.
-        Constraint: VRAM >= 24GB unless gradient checkpointing is strictly managed (but here we Fail Fast).
+        Validates if the current environment and manifest are suitable for this strategy.
         """
         logger.info("Validating ORPO Strategy requirements.")
 
         if self.manifest.method_config.type != "orpo":
-            # Should technically be checked by Factory, but good for safety
             raise ValueError("Invalid strategy type for ORPOStrategy")
 
         # Check Unsloth
         if FastLanguageModel is None:
             raise RuntimeError("Unsloth is required for ORPO strategy but is not installed.")
 
-        # Check Hardware
-        if torch and torch.cuda.is_available():
-            gpu_idx = 0  # Default to 0 for now
-            try:
-                device_props = torch.cuda.get_device_properties(gpu_idx)
-                total_memory = device_props.total_memory
-                total_memory_gb = total_memory / self.BYTES_PER_GB
-
-                logger.info(f"Detected VRAM: {total_memory_gb:.2f} GB")
-
-                strict_check = getattr(self.manifest.method_config, "strict_hardware_check", True)
-
-                # PRD: If VRAM < 24GB: Fail Fast
-                # (unless allow_gradient_checkpointing is forced, which implies strict_check=False)
-                if total_memory_gb < self.MIN_VRAM_GB:
-                    if strict_check:
-                        msg = (
-                            f"Insufficient VRAM for ORPO. Detected {total_memory_gb:.2f}GB, required "
-                            f"{self.MIN_VRAM_GB}GB. Upgrade node or disable strict hardware checks."
-                        )
-                        raise RuntimeError(msg)
-                    else:
-                        logger.warning(
-                            f"VRAM {total_memory_gb:.2f}GB is below recommended {self.MIN_VRAM_GB}GB for ORPO. "
-                            "Proceeding due to disabled strict check, but OOM is likely."
-                        )
-            except Exception as e:
-                # If we can't query device (e.g. wrong index), we might warn or fail.
-                # Assuming index 0 exists if is_available is true.
-                if isinstance(e, RuntimeError) and "Insufficient VRAM" in str(e):
-                    raise e
-                logger.warning(f"Could not query GPU properties: {e}")
-        else:
-            logger.warning("No CUDA device detected. Validation skipped (assuming CPU/Mock environment).")
+        # Check Hardware Environment
+        self.validate_environment()
 
     def train(self, train_dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
