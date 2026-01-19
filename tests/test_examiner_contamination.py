@@ -83,6 +83,12 @@ class TestDecontaminationChecker:
         test = ["a b"]
         assert checker.check_overlap(train, test) == 0.0
 
+    def test_train_ngrams_zero(self, checker: DecontaminationChecker) -> None:
+        # Train set has text, but not enough for n-grams
+        train = ["a b"]  # shorter than N=3
+        test = ["a b c d"]
+        assert checker.check_overlap(train, test) == 0.0
+
     def test_case_sensitivity(self, checker: DecontaminationChecker) -> None:
         # Default behavior: Case sensitive
         train = ["One Two Three"]
