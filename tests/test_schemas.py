@@ -66,6 +66,14 @@ def test_valid_training_manifest(valid_manifest_data: Dict[str, Any]) -> None:
     manifest = TrainingManifest(**valid_manifest_data)
     assert manifest.job_id == "test-job-1"
     assert manifest.method_config.type == MethodType.DORA
+    assert manifest.publish_target is None
+
+
+def test_valid_training_manifest_with_publish(valid_manifest_data: Dict[str, Any]) -> None:
+    valid_manifest_data["publish_target"] = {"registry": "s3://models", "tag": "v1"}
+    manifest = TrainingManifest(**valid_manifest_data)
+    assert manifest.publish_target is not None
+    assert manifest.publish_target.registry == "s3://models"
 
 
 def test_invalid_method_type(valid_manifest_data: Dict[str, Any]) -> None:
