@@ -23,7 +23,7 @@ from utils.logger import logger
 
 try:
     import torch
-except ImportError:
+except ImportError:  # pragma: no cover
     torch = None
 
 try:
