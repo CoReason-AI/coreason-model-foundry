@@ -41,12 +41,19 @@ class ComputeConfig(BaseModel):
     quantization: Literal["4bit", "8bit", "none"] = "4bit"
 
 
+class PublishConfig(BaseModel):
+    registry: str
+    tag: str
+    trigger_deployment: bool = False
+
+
 class TrainingManifest(BaseModel):
     job_id: str
     base_model: str
     method_config: MethodConfig
     dataset: DatasetConfig
     compute: ComputeConfig
+    publish_target: Optional[PublishConfig] = None
 
 
 class MergeMethod(str, Enum):

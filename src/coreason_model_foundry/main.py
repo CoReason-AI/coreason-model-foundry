@@ -18,6 +18,7 @@ from typing import Any, Dict, List
 import yaml
 
 from coreason_model_foundry.curator.main import Curator
+from coreason_model_foundry.publisher import ArtifactPublisher
 from coreason_model_foundry.schemas import TrainingManifest
 from coreason_model_foundry.strategies.factory import StrategyFactory
 from utils.logger import logger
@@ -117,6 +118,21 @@ def orchestrate_training(manifest_path: str) -> None:
 
         logger.info("Training completed successfully.")
         logger.info(f"Result: {result}")
+
+        # 6. Distribute (Publish)
+        if manifest.publish_target:
+            output_dir = result.get("output_dir")
+            if output_dir:
+                publisher = ArtifactPublisher()
+                publisher.publish_artifact(
+                    artifact_path=output_dir,
+                    target_registry=manifest.publish_target.registry,
+                    tag=manifest.publish_target.tag,
+                )
+            else:
+                logger.warning("No output directory returned from strategy. Skipping publication.")
+        else:
+            logger.info("No publish target defined in manifest. Skipping publication.")
 
     except Exception as e:
         logger.exception("Crucible execution failed.")
