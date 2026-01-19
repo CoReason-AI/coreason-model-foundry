@@ -132,6 +132,24 @@ def test_orpo_validate_hardware_skip_check_4bit(orpo_manifest: TrainingManifest)
         strategy.validate()
 
 
+def test_orpo_validate_hardware_8bit_pass(orpo_manifest: TrainingManifest) -> None:
+    """Test validation passes for 8bit quantization even with low VRAM."""
+    mock_torch = sys.modules["torch"]
+    mock_torch.cuda.get_device_properties.return_value.total_memory = 16 * (1024**3)
+
+    orpo_manifest.compute.quantization = "8bit"
+
+    with (
+        patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", MagicMock()),
+        patch("coreason_model_foundry.strategies.orpo.torch", mock_torch),
+    ):
+        from coreason_model_foundry.strategies.orpo import ORPOStrategy
+
+        strategy = ORPOStrategy(orpo_manifest)
+        # Should NOT raise
+        strategy.validate()
+
+
 def test_orpo_train_success(orpo_manifest: TrainingManifest, sample_orpo_dataset: List[Dict[str, str]]) -> None:
     """Test that ORPO strategy correctly initializes Unsloth and ORPOTrainer and calls train."""
 
