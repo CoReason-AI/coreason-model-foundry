@@ -21,6 +21,7 @@ from coreason_model_foundry.schemas import (
     MethodType,
     TrainingManifest,
 )
+from coreason_model_foundry.utils.hardware import HardwareIncompatibleError
 
 
 # --- Mocks Setup ---
@@ -81,6 +82,7 @@ def test_orpo_validate_hardware_success(orpo_manifest: TrainingManifest) -> None
     mock_torch.cuda.get_device_properties.return_value.total_memory = 25 * (1024**3)
 
     # Patch torch inside orpo module because it might be None if import failed earlier
+    # Also patch hardware utils torch
     with (
         patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", MagicMock()),
         patch("coreason_model_foundry.strategies.orpo.torch", mock_torch),
@@ -88,16 +90,18 @@ def test_orpo_validate_hardware_success(orpo_manifest: TrainingManifest) -> None
         from coreason_model_foundry.strategies.orpo import ORPOStrategy
 
         strategy = ORPOStrategy(orpo_manifest)
-        # Should not raise
+        # Should not raise (quantization is 4bit, so check skipped, but good to test)
         strategy.validate()
 
 
-def test_orpo_validate_hardware_fail_fast(orpo_manifest: TrainingManifest) -> None:
-    """Test validation fails when VRAM < 24GB."""
+def test_orpo_validate_hardware_fail_fast_full_precision(orpo_manifest: TrainingManifest) -> None:
+    """Test validation fails when VRAM < 24GB and quantization is 'none'."""
     mock_torch = sys.modules["torch"]
     # 16 GB
     mock_torch.cuda.get_device_properties.return_value.total_memory = 16 * (1024**3)
 
+    orpo_manifest.compute.quantization = "none"
+
     with (
         patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", MagicMock()),
         patch("coreason_model_foundry.strategies.orpo.torch", mock_torch),
@@ -106,14 +110,16 @@ def test_orpo_validate_hardware_fail_fast(orpo_manifest: TrainingManifest) -> No
 
         strategy = ORPOStrategy(orpo_manifest)
 
-        with pytest.raises(RuntimeError, match="Insufficient VRAM for ORPO"):
+        with pytest.raises(HardwareIncompatibleError, match="Insufficient VRAM"):
             strategy.validate()
 
 
-def test_orpo_validate_hardware_warning_only(orpo_manifest: TrainingManifest) -> None:
-    """Test validation warns but proceeds if strict_hardware_check is False."""
+def test_orpo_validate_hardware_skip_check_4bit(orpo_manifest: TrainingManifest) -> None:
+    """Test validation skips check (or passes) for 4bit even with low VRAM."""
     mock_torch = sys.modules["torch"]
     mock_torch.cuda.get_device_properties.return_value.total_memory = 16 * (1024**3)
+
+    orpo_manifest.compute.quantization = "4bit"
 
     with (
         patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", MagicMock()),
@@ -121,11 +127,26 @@ def test_orpo_validate_hardware_warning_only(orpo_manifest: TrainingManifest) ->
     ):
         from coreason_model_foundry.strategies.orpo import ORPOStrategy
 
-        # Set strict_hardware_check to False properly
-        orpo_manifest.method_config.strict_hardware_check = False
+        strategy = ORPOStrategy(orpo_manifest)
+        # Should NOT raise because we only check for quantization='none'
+        strategy.validate()
+
+
+def test_orpo_validate_hardware_8bit_pass(orpo_manifest: TrainingManifest) -> None:
+    """Test validation passes for 8bit quantization even with low VRAM."""
+    mock_torch = sys.modules["torch"]
+    mock_torch.cuda.get_device_properties.return_value.total_memory = 16 * (1024**3)
+
+    orpo_manifest.compute.quantization = "8bit"
+
+    with (
+        patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", MagicMock()),
+        patch("coreason_model_foundry.strategies.orpo.torch", mock_torch),
+    ):
+        from coreason_model_foundry.strategies.orpo import ORPOStrategy
 
         strategy = ORPOStrategy(orpo_manifest)
-        # Should not raise
+        # Should NOT raise
         strategy.validate()
 
 

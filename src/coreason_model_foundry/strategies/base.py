@@ -24,10 +24,19 @@ class TrainingStrategy(ABC):
     def __init__(self, manifest: TrainingManifest):
         self.manifest = manifest
 
+    def validate_environment(self) -> None:
+        """
+        Validates if the hardware environment meets the strategy requirements.
+        Override this in subclasses for specific checks.
+        """
+        # Default implementation does nothing
+        return
+
     @abstractmethod
     def validate(self) -> None:
         """
         Validates if the current environment and manifest are suitable for this strategy.
+        Should call self.validate_environment().
         Raises exceptions if constraints are not met.
         """
         pass  # pragma: no cover
