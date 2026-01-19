@@ -25,6 +25,7 @@ class MethodConfig(BaseModel):
     rank: int = Field(..., gt=0, description="LoRA Rank")
     alpha: int = Field(..., gt=0, description="LoRA Alpha")
     target_modules: List[str] = Field(..., min_length=1, description="List of target modules for LoRA")
+    strict_hardware_check: bool = Field(True, description="Fail on hardware mismatch if True")
 
 
 class DatasetConfig(BaseModel):
