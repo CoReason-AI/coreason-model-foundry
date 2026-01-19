@@ -103,10 +103,16 @@ def test_calculate_provenance_id_sensitivity() -> None:
     assert pid_ab != pid_ba
 
 
+@patch("coreason_model_foundry.main.ArtifactPublisher")
 @patch("coreason_model_foundry.main.Curator")
 @patch("coreason_model_foundry.main.StrategyFactory")
 @patch("coreason_model_foundry.main.load_manifest")
-def test_orchestrate_training_flow(mock_load: MagicMock, mock_factory: MagicMock, mock_curator_cls: MagicMock) -> None:
+def test_orchestrate_training_flow(
+    mock_load: MagicMock,
+    mock_factory: MagicMock,
+    mock_curator_cls: MagicMock,
+    mock_publisher_cls: MagicMock,
+) -> None:
     # Setup Mocks
     mock_manifest = MagicMock()
     mock_manifest.job_id = "test-job"
@@ -114,6 +120,11 @@ def test_orchestrate_training_flow(mock_load: MagicMock, mock_factory: MagicMock
     mock_manifest.method_config.type = "dora"
     # Ensure model_dump_json returns a string so encode works
     mock_manifest.model_dump_json.return_value = '{"job_id": "test-job"}'
+
+    # Configure Publish Target
+    mock_manifest.publish_target.registry = "s3://test"
+    mock_manifest.publish_target.tag = "v1"
+
     mock_load.return_value = mock_manifest
 
     mock_curator_instance = mock_curator_cls.return_value
@@ -122,6 +133,8 @@ def test_orchestrate_training_flow(mock_load: MagicMock, mock_factory: MagicMock
     mock_strategy = MagicMock()
     mock_strategy.train.return_value = {"status": "success", "output_dir": "artifacts/test"}
     mock_factory.get_strategy.return_value = mock_strategy
+
+    mock_publisher_instance = mock_publisher_cls.return_value
 
     # Execute
     orchestrate_training("dummy_path.yaml")
@@ -136,6 +149,12 @@ def test_orchestrate_training_flow(mock_load: MagicMock, mock_factory: MagicMock
     # Strategy
     mock_factory.get_strategy.assert_called_once_with(mock_manifest)
     mock_strategy.train.assert_called_once()
+
+    # Publisher
+    mock_publisher_cls.assert_called_once()
+    mock_publisher_instance.publish_artifact.assert_called_once_with(
+        artifact_path="artifacts/test", target_registry="s3://test", tag="v1"
+    )
 
 
 @patch("coreason_model_foundry.main.Curator")
