@@ -8,8 +8,9 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
+import builtins
 import sys
-from typing import Generator
+from typing import Any, Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -179,33 +180,24 @@ def test_check_vram_multi_gpu_selection(mock_torch: MagicMock) -> None:
     check_vram_compatibility(24.0, device_id=1)
 
 
-def test_check_vram_torch_import_error() -> None:
-    """Test behavior when torch cannot be imported."""
-    with patch.dict(sys.modules, {"torch": None}):
-        # sys.modules["torch"] = None simulates "import torch" raising ImportError
-        # (or rather it makes 'import torch' fail if it wasn't already imported,
-        # but if it's None, it might raise ModuleNotFoundError).
-        # Better to remove it from sys.modules and make __import__ fail.
+def test_hardware_torch_import_error() -> None:
+    """Test graceful handling when torch cannot be imported."""
+    real_import = builtins.__import__
 
-        # We can use the strategy from test_strategies_orpo_coverage.py
-        # But hardware.py imports torch inside function.
-        # So we just need to ensure 'import torch' raises ImportError.
+    def fail_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "torch":
+            raise ImportError("Mocked ImportError")
+        return real_import(name, *args, **kwargs)
 
-        with patch("builtins.__import__", side_effect=ImportError("No torch")):
-            # We must remove hardware module to force re-import?
-            # No, verify_vram imports torch inside the function.
-            # So we just call it.
+    with patch("builtins.__import__", side_effect=fail_import):
+        with patch.dict(sys.modules):
+            if "torch" in sys.modules:
+                del sys.modules["torch"]
 
-            # But 'pytest' might have already imported 'torch'.
-            # We need to ensure the `import torch` inside `check_vram_compatibility` triggers our mock.
+            # 1. Test get_gpu_memory_info handling
+            info = get_gpu_memory_info()
+            assert info == {}
 
-            # Since 'check_vram_compatibility' is already imported from 'coreason_model_foundry.utils.hardware',
-            # the `import torch` inside it will run.
-            # If torch is already in sys.modules, it returns it.
-            # So we must remove torch from sys.modules.
-            pass
-
-    # This is tricky to test cleanly without breaking other tests or environment.
-    # We'll skip this extreme edge case for now as it's covered by logic inspection
-    # and the existing tests cover "is_available() = False".
-    pass
+            # 2. Test check_vram_compatibility handling
+            # Should not raise, just return/log warning
+            check_vram_compatibility(24.0)
