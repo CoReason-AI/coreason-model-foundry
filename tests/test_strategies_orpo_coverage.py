@@ -66,13 +66,13 @@ def test_orpo_cuda_query_exception() -> None:
             strict_hardware_check=True,
         ),
         dataset=DatasetConfig(ref="synthesis://test", dedup_threshold=0.95),
-        compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024),
+        compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024, quantization="none"),
     )
 
     with (
         patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", MagicMock()),
         patch("coreason_model_foundry.strategies.orpo.torch", mock_torch),
-        patch("coreason_model_foundry.strategies.orpo.logger") as mock_logger,
+        patch("coreason_model_foundry.utils.hardware.logger") as mock_logger,
     ):
         from coreason_model_foundry.strategies.orpo import ORPOStrategy
 
@@ -83,7 +83,10 @@ def test_orpo_cuda_query_exception() -> None:
 
         # Verify warning logged
         mock_logger.warning.assert_called()
-        assert "Could not query GPU properties" in mock_logger.warning.call_args[0][0]
+
+        # Check if any call contains the expected message
+        calls = [args[0] for args, _ in mock_logger.warning.call_args_list]
+        assert any("Failed to get properties" in c for c in calls)
 
 
 def test_orpo_config_propagation() -> None:
@@ -150,22 +153,20 @@ def test_orpo_no_cuda_warning() -> None:
             type=MethodType.ORPO, rank=8, alpha=16, target_modules=["q"], strict_hardware_check=True
         ),
         dataset=DatasetConfig(ref="synthesis://test", dedup_threshold=0.95),
-        compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024),
+        compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024, quantization="none"),
     )
 
     with (
         patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", MagicMock()),
         patch("coreason_model_foundry.strategies.orpo.torch", mock_torch),
-        patch("coreason_model_foundry.strategies.orpo.logger") as mock_logger,
+        patch("coreason_model_foundry.utils.hardware.logger") as mock_logger,
     ):
         from coreason_model_foundry.strategies.orpo import ORPOStrategy
 
         strategy = ORPOStrategy(manifest)
         strategy.validate()
 
-        mock_logger.warning.assert_called_with(
-            "No CUDA device detected. Validation skipped (assuming CPU/Mock environment)."
-        )
+        mock_logger.warning.assert_called_with("CUDA not available. Skipping VRAM check (running on CPU?).")
 
 
 def test_orpo_invalid_method_type() -> None:
@@ -261,3 +262,46 @@ def test_orpo_import_error_torch() -> None:
 
             # Since import torch failed, orpo_module.torch should be None
             assert orpo_module.torch is None  # type: ignore
+
+
+def test_orpo_unsloth_missing_validate() -> None:
+    """Test validation fails if Unsloth is missing (FastLanguageModel is None)."""
+    manifest = TrainingManifest(
+        job_id="test-job-unsloth-missing",
+        base_model="model",
+        method_config=MethodConfig(
+            type=MethodType.ORPO, rank=8, alpha=16, target_modules=["q"], strict_hardware_check=True
+        ),
+        dataset=DatasetConfig(ref="synthesis://test", dedup_threshold=0.95),
+        compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024),
+    )
+
+    with patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", None):
+        from coreason_model_foundry.strategies.orpo import ORPOStrategy
+
+        strategy = ORPOStrategy(manifest)
+        with pytest.raises(RuntimeError, match="Unsloth is required"):
+            strategy.validate()
+
+
+def test_orpo_unsloth_missing_train() -> None:
+    """Test training fails if Unsloth is missing (FastLanguageModel is None)."""
+    manifest = TrainingManifest(
+        job_id="test-job-unsloth-missing",
+        base_model="model",
+        method_config=MethodConfig(
+            type=MethodType.ORPO, rank=8, alpha=16, target_modules=["q"], strict_hardware_check=True
+        ),
+        dataset=DatasetConfig(ref="synthesis://test", dedup_threshold=0.95),
+        compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024),
+    )
+
+    with patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", None):
+        from coreason_model_foundry.strategies.orpo import ORPOStrategy
+
+        strategy = ORPOStrategy(manifest)
+
+        # Call train directly, skipping validate (or validate already checked,
+        # but assuming somehow it passed or we are in a state where it's None now)
+        with pytest.raises(RuntimeError, match="Unsloth is required"):
+            strategy.train([{"prompt": "a", "chosen": "b", "rejected": "c"}])
