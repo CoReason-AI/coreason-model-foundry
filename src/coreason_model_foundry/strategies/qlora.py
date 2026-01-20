@@ -32,13 +32,18 @@ except ImportError:
 class QLoRAStrategy(TrainingStrategy):
     """
     Implementation of QLoRA (Quantized Low-Rank Adaptation).
+
     Best for memory efficiency.
     """
 
     def validate_environment(self) -> None:
         """
         Validates hardware constraints for QLoRA.
+
         Rule: Must run on GPU (CUDA available).
+
+        Raises:
+            EnvironmentError: If CUDA is not available.
         """
         logger.info("Validating QLoRA Environment...")
 
@@ -50,6 +55,10 @@ class QLoRAStrategy(TrainingStrategy):
     def validate(self) -> None:
         """
         Validates if the current environment and manifest are suitable for this strategy.
+
+        Raises:
+            RuntimeError: If Unsloth is missing.
+            EnvironmentError: If environment checks fail.
         """
         logger.info("Validating QLoRA Strategy requirements.")
 
@@ -64,6 +73,16 @@ class QLoRAStrategy(TrainingStrategy):
     def train(self, train_dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Executes QLoRA Training.
+
+        Args:
+            train_dataset: The processed dataset ready for training.
+
+        Returns:
+            Dict containing artifacts paths or execution status.
+
+        Raises:
+            ValueError: If dataset is empty.
+            RuntimeError: If Unsloth is missing.
         """
         logger.info(f"Initializing QLoRA training for job {self.manifest.job_id}")
 
