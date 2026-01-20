@@ -77,10 +77,16 @@ def base_manifest() -> TrainingManifest:
 
 def test_factory_creates_qlora(base_manifest: TrainingManifest) -> None:
     base_manifest.method_config.type = MethodType.QLORA
-    strategy = StrategyFactory.get_strategy(base_manifest)
-    assert isinstance(strategy, QLoRAStrategy)
-    assert isinstance(strategy, TrainingStrategy)
-    assert strategy.manifest == base_manifest
+
+    # Patch FastLanguageModel and torch for QLoRA validation
+    with (
+        patch("coreason_model_foundry.strategies.qlora.FastLanguageModel"),
+        patch("coreason_model_foundry.strategies.qlora.torch", sys.modules["torch"]),
+    ):
+        strategy = StrategyFactory.get_strategy(base_manifest)
+        assert isinstance(strategy, QLoRAStrategy)
+        assert isinstance(strategy, TrainingStrategy)
+        assert strategy.manifest == base_manifest
 
 
 def test_factory_creates_dora(base_manifest: TrainingManifest) -> None:
@@ -112,13 +118,32 @@ def test_factory_validation_error_unknown_type(base_manifest: TrainingManifest) 
 
 
 def test_strategies_have_validate_and_train_methods(base_manifest: TrainingManifest) -> None:
-    strategy = StrategyFactory.get_strategy(base_manifest)
-    assert hasattr(strategy, "validate")
-    assert hasattr(strategy, "train")
+    # Patch QLoRA dependencies to allow instantiation
+    with (
+        patch("coreason_model_foundry.strategies.qlora.FastLanguageModel"),
+        patch("coreason_model_foundry.strategies.qlora.torch", sys.modules["torch"]),
+        # We also need to patch SFTTrainer because the real train() calls it,
+        # and the test assertion checks the result which assumes successful run.
+        # But wait, the original code returned "mock_success".
+        # The NEW code calls trainer.train() and returns "success".
+        # So we need to mock SFTTrainer and Dataset.
+        patch("coreason_model_foundry.strategies.qlora.SFTTrainer"),
+        patch("coreason_model_foundry.strategies.qlora.Dataset"),
+    ):
+        strategy = StrategyFactory.get_strategy(base_manifest)
+        assert hasattr(strategy, "validate")
+        assert hasattr(strategy, "train")
 
-    # Test basic return of train (mocked) for QLoRA
-    result = strategy.train([{}])  # Pass empty list of dicts
-    assert result["status"] == "mock_success"
+        # Test basic return of train for QLoRA
+        # We need to setup mocks so it doesn't crash
+
+        # We need to ensure from_pretrained returns mocks
+        with patch(
+            "coreason_model_foundry.strategies.qlora.FastLanguageModel.from_pretrained",
+            return_value=(MagicMock(), MagicMock()),
+        ):
+            result = strategy.train([{"instruction": "i", "input": "i", "output": "o"}])
+            assert result["status"] == "success"
 
 
 def test_dora_train_method(base_manifest: TrainingManifest) -> None:
@@ -169,7 +194,11 @@ def test_qlora_validation_warning_captured(base_manifest: TrainingManifest) -> N
     base_manifest.compute.quantization = "8bit"  # Not 4bit
 
     # Now that QLoRA imports logger, we can patch it
-    with patch("coreason_model_foundry.strategies.qlora.logger") as mock_logger:
+    with (
+        patch("coreason_model_foundry.strategies.qlora.logger") as mock_logger,
+        patch("coreason_model_foundry.strategies.qlora.FastLanguageModel"),
+        patch("coreason_model_foundry.strategies.qlora.torch", sys.modules["torch"]),
+    ):
         StrategyFactory.get_strategy(base_manifest)
         mock_logger.warning.assert_called_once()
         assert "QLoRA usually requires 4bit quantization" in mock_logger.warning.call_args[0][0]
@@ -180,6 +209,9 @@ def test_validate_is_called_during_factory_creation(base_manifest: TrainingManif
     base_manifest.method_config.type = MethodType.QLORA
 
     # We patch the QLoRAStrategy class specifically to spy on its `validate` method
+    # We also need to patch dependencies inside `__init__` if any, but `__init__` is lightweight.
+    # However, validate() calls validate_environment() which checks torch.
+    # But since we mock `validate` completely, it won't run real validation logic.
     with patch.object(QLoRAStrategy, "validate", autospec=True) as mock_validate:
         strategy = StrategyFactory.get_strategy(base_manifest)
         mock_validate.assert_called_once_with(strategy)
@@ -189,17 +221,21 @@ def test_strategy_isolation(base_manifest: TrainingManifest) -> None:
     """Verify that strategies created by the factory are independent instances."""
     base_manifest.method_config.type = MethodType.QLORA
 
-    strategy_1 = StrategyFactory.get_strategy(base_manifest)
-    strategy_2 = StrategyFactory.get_strategy(base_manifest)
+    with (
+        patch("coreason_model_foundry.strategies.qlora.FastLanguageModel"),
+        patch("coreason_model_foundry.strategies.qlora.torch", sys.modules["torch"]),
+    ):
+        strategy_1 = StrategyFactory.get_strategy(base_manifest)
+        strategy_2 = StrategyFactory.get_strategy(base_manifest)
 
-    assert strategy_1 is not strategy_2
-    assert strategy_1.manifest is strategy_2.manifest  # Same manifest object passed in
+        assert strategy_1 is not strategy_2
+        assert strategy_1.manifest is strategy_2.manifest  # Same manifest object passed in
 
-    # Modify manifest for second strategy
-    # If we create a new manifest, they should be different
-    manifest_2 = base_manifest.model_copy(deep=True)
-    manifest_2.job_id = "job-2"
-    strategy_3 = StrategyFactory.get_strategy(manifest_2)
+        # Modify manifest for second strategy
+        # If we create a new manifest, they should be different
+        manifest_2 = base_manifest.model_copy(deep=True)
+        manifest_2.job_id = "job-2"
+        strategy_3 = StrategyFactory.get_strategy(manifest_2)
 
-    assert strategy_3.manifest.job_id == "job-2"
-    assert strategy_1.manifest.job_id == "test-job-1"
+        assert strategy_3.manifest.job_id == "job-2"
+        assert strategy_1.manifest.job_id == "test-job-1"
