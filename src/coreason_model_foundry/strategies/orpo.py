@@ -38,6 +38,7 @@ except ImportError:
 class ORPOStrategy(TrainingStrategy):
     """
     Implementation of ORPO (Odds Ratio Preference Optimization).
+
     Best for safety, alignment, and chat tasks.
     Requires Triplet Data.
     """
@@ -47,7 +48,11 @@ class ORPOStrategy(TrainingStrategy):
     def validate_environment(self) -> None:
         """
         Validates hardware constraints for ORPO.
-        Rule: If quantization == 'none' AND vram < 24GB -> Raise EnvironmentError.
+
+        Rule: If quantization == 'none' AND vram < 24GB -> Raise HardwareIncompatibleError.
+
+        Raises:
+            HardwareIncompatibleError: If VRAM is insufficient.
         """
         logger.info("Validating ORPO Environment...")
 
@@ -71,6 +76,11 @@ class ORPOStrategy(TrainingStrategy):
     def validate(self) -> None:
         """
         Validates if the current environment and manifest are suitable for this strategy.
+
+        Raises:
+            ValueError: If strategy type is incorrect.
+            RuntimeError: If Unsloth is missing.
+            HardwareIncompatibleError: If hardware checks fail.
         """
         logger.info("Validating ORPO Strategy requirements.")
 
@@ -87,6 +97,16 @@ class ORPOStrategy(TrainingStrategy):
     def train(self, train_dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Executes ORPO Training.
+
+        Args:
+            train_dataset: The processed dataset ready for training.
+
+        Returns:
+            Dict containing artifacts paths or execution status.
+
+        Raises:
+            ValueError: If dataset is empty.
+            RuntimeError: If Unsloth is missing.
         """
         logger.info(f"Initializing ORPO training for job {self.manifest.job_id}")
 

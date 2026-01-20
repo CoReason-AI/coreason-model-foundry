@@ -28,10 +28,17 @@ except ImportError:
 class DoRAStrategy(TrainingStrategy):
     """
     Implementation of DoRA (Weight-Decomposed Low-Rank Adaptation).
+
     Best for reasoning and logic tasks.
     """
 
     def validate(self) -> None:
+        """
+        Validates if the current environment and manifest are suitable for DoRA.
+
+        Raises:
+            RuntimeError: If Unsloth is required but not installed.
+        """
         logger.info("Validating DoRA Strategy requirements.")
         if FastLanguageModel is None:
             # We fail fast if the kernel is missing
@@ -43,6 +50,16 @@ class DoRAStrategy(TrainingStrategy):
     def train(self, train_dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Executes DoRA Training.
+
+        Args:
+            train_dataset: The processed dataset ready for training.
+
+        Returns:
+            Dict containing artifacts paths or execution status.
+
+        Raises:
+            ValueError: If dataset is empty.
+            RuntimeError: If Unsloth is missing.
         """
         logger.info(f"Initializing DoRA training for job {self.manifest.job_id}")
 
