@@ -1,0 +1,8 @@
+datasets
+loguru
+mergekit
+pydantic
+pyyaml
+sentence-transformers
+transformers
+trl

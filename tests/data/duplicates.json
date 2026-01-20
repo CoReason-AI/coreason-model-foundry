@@ -1,0 +1,17 @@
+[
+  {
+    "instruction": "Extract JSON",
+    "input": "Patient: John Doe, Age: 45",
+    "output": "{\"name\": \"John Doe\", \"age\": 45}"
+  },
+  {
+    "instruction": "Extract JSON",
+    "input": "Patient: John Doe, Age: 45",
+    "output": "{\"name\": \"John Doe\", \"age\": 45}"
+  },
+  {
+    "instruction": "Summarize",
+    "input": "Long text here...",
+    "output": "Summary."
+  }
+]

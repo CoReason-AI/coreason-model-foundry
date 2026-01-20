@@ -8,9 +8,21 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
-from coreason_model_foundry.utils.logger import logger
+import argparse
+from pathlib import Path
+
+from coreason_model_foundry.service import ModelFoundryService
 
 
-def hello_world() -> str:
-    logger.info("Hello World!")
-    return "Hello World!"
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Coreason Model Foundry - The Refinery")
+    parser.add_argument("--manifest", type=str, required=True, help="Path to the Training Manifest YAML")
+    args = parser.parse_args()
+
+    # Use the Facade to run the service synchronously
+    with ModelFoundryService() as service:
+        service.orchestrate_training(Path(args.manifest))
+
+
+if __name__ == "__main__":
+    main()

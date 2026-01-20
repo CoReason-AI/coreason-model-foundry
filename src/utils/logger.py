@@ -13,27 +13,24 @@ from pathlib import Path
 
 from loguru import logger
 
-# Remove default handler
+# Ensure logs directory exists
+LOG_DIR = Path("logs")
+LOG_DIR.mkdir(exist_ok=True)
+LOG_FILE = LOG_DIR / "app.log"
+
+# Configure logger
 logger.remove()
 
-# Sink 1: Stdout (Human-readable)
+# Console Sink (Stderr, Human-readable)
+logger.add(sys.stderr, level="INFO")
+
+# File Sink (JSON, Rotated, Retained)
 logger.add(
-    sys.stderr,
+    LOG_FILE,
     level="INFO",
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-)
-
-# Ensure logs directory exists
-log_path = Path("logs")
-if not log_path.exists():
-    log_path.mkdir(parents=True, exist_ok=True)
-
-# Sink 2: File (JSON, Rotation, Retention)
-logger.add(
-    "logs/app.log",
     rotation="500 MB",
     retention="10 days",
     serialize=True,
-    enqueue=True,
-    level="INFO",
 )
+
+__all__ = ["logger"]
