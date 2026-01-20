@@ -20,6 +20,9 @@ RUN python -m build --wheel --outdir /wheels
 # Stage 2: Runtime
 FROM python:3.12-slim AS runtime
 
+# Install system updates
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 # Create a non-root user
 RUN useradd --create-home --shell /bin/bash appuser
 USER appuser
