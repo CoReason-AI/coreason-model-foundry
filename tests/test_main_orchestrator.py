@@ -8,6 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -214,6 +215,103 @@ def test_service_sync_facade(mock_manifest_file: Path) -> None:
         from coreason_model_foundry.service import ModelFoundryService
 
         with ModelFoundryService() as service:
-            service.orchestrate_training(mock_manifest_file)
+            # Also test the string path conversion
+            service.orchestrate_training(str(mock_manifest_file))
 
         mock_async_orch.assert_called_once_with(mock_manifest_file)
+
+
+# --- Coverage Filler Tests ---
+
+
+@patch("coreason_model_foundry.service.ArtifactPublisher")
+@patch("coreason_model_foundry.service.Curator")
+@patch("coreason_model_foundry.service.StrategyFactory")
+@patch("coreason_model_foundry.service.ModelFoundryServiceAsync.load_manifest")
+@pytest.mark.asyncio
+async def test_orchestrate_training_no_publish_target(
+    mock_load: AsyncMock,
+    mock_factory: MagicMock,
+    mock_curator_cls: MagicMock,
+    mock_publisher_cls: MagicMock,
+) -> None:
+    """Test when publish_target is None (default)."""
+    # Setup
+    mock_manifest = MagicMock()
+    mock_manifest.job_id = "test-job-no-pub"
+    mock_manifest.method_config.type = "dora"
+    mock_manifest.model_dump_json.return_value = '{"job_id": "test-job"}'
+    mock_manifest.publish_target = None  # EXPLICITLY NONE
+
+    mock_load.return_value = mock_manifest
+
+    # Execution should proceed without publishing
+    mock_curator_instance = mock_curator_cls.return_value
+    mock_curator_instance.prepare_dataset.return_value = [{"data": "val"}]
+
+    mock_strategy = MagicMock()
+    mock_strategy.train.return_value = {"output_dir": "artifacts/test"}
+    mock_factory.get_strategy.return_value = mock_strategy
+
+    # Act
+    service = ModelFoundryServiceAsync()
+    await service.orchestrate_training(Path("dummy.yaml"))
+    await service._client.aclose()
+
+    # Assert
+    mock_publisher_cls.assert_called_once()  # Instantiated in init
+    mock_publisher_cls.return_value.publish_artifact.assert_not_called()
+
+
+@patch("coreason_model_foundry.service.ArtifactPublisher")
+@patch("coreason_model_foundry.service.Curator")
+@patch("coreason_model_foundry.service.StrategyFactory")
+@patch("coreason_model_foundry.service.ModelFoundryServiceAsync.load_manifest")
+@patch("coreason_model_foundry.service.logger")
+@pytest.mark.asyncio
+async def test_orchestrate_training_publish_target_no_output_dir(
+    mock_logger: MagicMock,
+    mock_load: AsyncMock,
+    mock_factory: MagicMock,
+    mock_curator_cls: MagicMock,
+    mock_publisher_cls: MagicMock,
+) -> None:
+    """Test when publish_target is set but strategy returns no output_dir."""
+    # Setup
+    mock_manifest = MagicMock()
+    mock_manifest.job_id = "test-job-fail-pub"
+    mock_manifest.method_config.type = "dora"
+    mock_manifest.model_dump_json.return_value = '{"job_id": "test-job"}'
+
+    # Configured publisher
+    mock_manifest.publish_target.registry = "s3://test"
+    mock_manifest.publish_target.tag = "v1"
+
+    mock_load.return_value = mock_manifest
+
+    # Strategy returns NO output_dir
+    mock_strategy = MagicMock()
+    mock_strategy.train.return_value = {"status": "success"}  # Missing output_dir
+    mock_factory.get_strategy.return_value = mock_strategy
+
+    mock_curator_instance = mock_curator_cls.return_value
+    mock_curator_instance.prepare_dataset.return_value = [{"data": "val"}]
+
+    # Act
+    service = ModelFoundryServiceAsync()
+    await service.orchestrate_training(Path("dummy.yaml"))
+    await service._client.aclose()
+
+    # Assert
+    mock_publisher_cls.return_value.publish_artifact.assert_not_called()
+    mock_logger.warning.assert_any_call("No output directory returned from strategy. Skipping publication.")
+
+
+def test_main_execution() -> None:
+    """Verify that main.py can be executed (covers __name__ == '__main__' block indirectly)."""
+    # This subprocess call runs the file, which triggers the if __name__ == "__main__": block
+    result = subprocess.run(
+        [sys.executable, "-m", "coreason_model_foundry.main", "--help"], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0
+    assert "usage:" in result.stdout
