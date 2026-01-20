@@ -16,25 +16,28 @@ from utils.logger import logger
 
 
 class DataResolver:
-    """
-    Resolves data references (URIs) to actual data.
+    """Resolves data references (URIs) to actual data.
+
     Supports local files for `synthesis://` scheme in testing/dev environments.
     """
 
     @staticmethod
     def resolve(uri: str) -> List[Dict[str, Any]]:
-        """
-        Resolves the given URI to a list of data dictionaries.
+        """Resolves the given URI to a list of data dictionaries.
+
+        Currently supports the `synthesis://` scheme by mapping it to a local
+        file path (e.g., `synthesis://path/to/data` -> `path/to/data.json`).
+        It attempts to append `.json` if missing and checks the current working directory.
 
         Args:
             uri: The URI to resolve (e.g., "synthesis://batch_clinical_reasoning").
 
         Returns:
-            A list of dictionaries containing the data.
+            List[Dict[str, Any]]: A list of dictionaries containing the data.
 
         Raises:
             FileNotFoundError: If the file referenced by the URI does not exist.
-            ValueError: If the URI scheme is unsupported.
+            ValueError: If the URI scheme is unsupported or the data format is invalid.
         """
         logger.info(f"Resolving data from URI: {uri}")
 

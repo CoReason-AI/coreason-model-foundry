@@ -15,24 +15,21 @@ from utils.logger import logger
 
 
 class DataFormatter:
-    """
-    Formats data according to the training method requirements.
-    """
+    """Formats data according to the training method requirements."""
 
     @staticmethod
     def format_and_validate(data: List[Dict[str, Any]], method: MethodType) -> List[Dict[str, Any]]:
-        """
-        Validates structure and standardizes format.
+        """Validates structure and standardizes format based on the training method.
 
         Args:
             data: Raw data list.
             method: The training method (QLORA/DORA -> SFT format, ORPO -> Preference format).
 
         Returns:
-            Formatted data list.
+            List[Dict[str, Any]]: Formatted data list.
 
         Raises:
-            ValueError: If required columns are missing.
+            ValueError: If required columns are missing for the specified method.
         """
         logger.info(f"Formatting data for method: {method}")
 

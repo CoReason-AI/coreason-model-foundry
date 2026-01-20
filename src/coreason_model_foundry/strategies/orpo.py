@@ -36,18 +36,16 @@ except ImportError:
 
 
 class ORPOStrategy(TrainingStrategy):
-    """
-    Implementation of ORPO (Odds Ratio Preference Optimization).
+    """Implementation of ORPO (Odds Ratio Preference Optimization).
 
-    Best for safety, alignment, and chat tasks.
-    Requires Triplet Data.
+    Best for safety, alignment, and chat tasks. Requires Triplet Data (prompt, chosen, rejected).
+    Implements strict hardware validation for high-memory configurations.
     """
 
     MIN_VRAM_GB = 24
 
     def validate_environment(self) -> None:
-        """
-        Validates hardware constraints for ORPO.
+        """Validates hardware constraints for ORPO.
 
         Rule: If quantization == 'none' AND vram < 24GB -> Raise HardwareIncompatibleError.
 
@@ -74,8 +72,7 @@ class ORPOStrategy(TrainingStrategy):
             pass
 
     def validate(self) -> None:
-        """
-        Validates if the current environment and manifest are suitable for this strategy.
+        """Validates if the current environment and manifest are suitable for this strategy.
 
         Raises:
             ValueError: If strategy type is incorrect.
@@ -95,14 +92,13 @@ class ORPOStrategy(TrainingStrategy):
         self.validate_environment()
 
     def train(self, train_dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Executes ORPO Training.
+        """Executes ORPO Training.
 
         Args:
             train_dataset: The processed dataset ready for training.
 
         Returns:
-            Dict containing artifacts paths or execution status.
+            Dict[str, Any]: Dictionary containing artifacts paths or execution status.
 
         Raises:
             ValueError: If dataset is empty.
@@ -208,6 +204,7 @@ class ORPOStrategy(TrainingStrategy):
 
 
 def is_bfloat16_supported() -> bool:
+    """Checks if bfloat16 is supported on the current device."""
     try:
         import torch
 

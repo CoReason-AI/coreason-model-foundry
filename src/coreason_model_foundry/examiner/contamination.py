@@ -14,20 +14,28 @@ from utils.logger import logger
 
 
 class DecontaminationChecker:
-    """
-    Checks for data contamination by calculating N-gram overlap between train and test sets.
+    """Checks for data contamination by calculating N-gram overlap between train and test sets.
+
+    Ensures that evaluation metrics are not inflated by memorization of the training data.
     """
 
     def __init__(self, n_gram_size: int = 13):
-        """
+        """Initializes the DecontaminationChecker.
+
         Args:
             n_gram_size: The size of N-grams to use for overlap checking (default 13).
+                         Higher values mean stricter matching.
         """
         self.n_gram_size = n_gram_size
 
     def _generate_ngrams(self, text: str) -> Set[str]:
-        """
-        Generates a set of N-grams from the given text.
+        """Generates a set of N-grams from the given text.
+
+        Args:
+            text: The input text.
+
+        Returns:
+            Set[str]: A set of unique N-grams found in the text.
         """
         words = text.split()
         if len(words) < self.n_gram_size:
@@ -40,15 +48,14 @@ class DecontaminationChecker:
         return ngrams
 
     def check_overlap(self, train_texts: List[str], test_texts: List[str]) -> float:
-        """
-        Calculates the percentage of test N-grams that appear in the training set.
+        """Calculates the percentage of test N-grams that appear in the training set.
 
         Args:
             train_texts: List of strings from the training set.
             test_texts: List of strings from the test set.
 
         Returns:
-            The contamination percentage (0.0 to 100.0).
+            float: The contamination percentage (0.0 to 100.0).
         """
         if not train_texts or not test_texts:
             logger.warning("Empty train or test set provided for decontamination check.")

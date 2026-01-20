@@ -16,16 +16,18 @@ from utils.logger import logger
 
 
 class SemDeDup:
-    """
-    Semantic Deduplication Module.
-    Embeds input text and clusters them to remove redundant examples.
+    """Semantic Deduplication Module.
+
+    Embeds input text and clusters them to remove redundant examples, keeping only
+    representative samples to maximize "Information Density".
     """
 
     def __init__(self, model_name: str = "all-MiniLM-L6-v2", threshold: float = 0.95):
-        """
+        """Initializes the SemDeDup module.
+
         Args:
-            model_name: The SentenceTransformer model to use.
-            threshold: Cosine similarity threshold for clustering.
+            model_name: The SentenceTransformer model to use for embedding.
+            threshold: Cosine similarity threshold for clustering (default: 0.95).
         """
         self.model_name = model_name
         self.threshold = threshold
@@ -34,21 +36,25 @@ class SemDeDup:
 
     @property
     def model(self) -> SentenceTransformer:
+        """Returns the loaded SentenceTransformer model, loading it if necessary."""
         if self._model is None:
             logger.info(f"Loading embedding model: {self.model_name}")
             self._model = SentenceTransformer(self.model_name)
         return self._model
 
     def prune(self, data: List[Dict[str, Any]], key_fields: List[str]) -> List[Dict[str, Any]]:
-        """
-        Prunes the dataset by clustering semantically similar examples.
+        """Prunes the dataset by clustering semantically similar examples.
+
+        Embeds the text content derived from `key_fields`, clusters vectors based on
+        cosine similarity, and retains only the first example (representative) from
+        each cluster.
 
         Args:
-            data: List of data items.
-            key_fields: List of keys in the dict to combine for embedding (e.g. ["instruction", "input"]).
+            data: List of data items (dictionaries).
+            key_fields: List of keys in the dict to combine for embedding (e.g., ["instruction", "input"]).
 
         Returns:
-            A pruned list of data items (representatives).
+            List[Dict[str, Any]]: A pruned list of data items (representatives).
         """
         if not data:
             return []

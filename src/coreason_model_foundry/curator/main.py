@@ -18,22 +18,31 @@ from utils.logger import logger
 
 
 class Curator:
-    """
-    The Data Curator.
-    Orchestrates data resolution, validation, formatting, and semantic deduplication.
+    """The Data Curator.
+
+    Orchestrates the data pipeline, including resolution, validation, formatting,
+    and semantic deduplication.
     """
 
     def __init__(self, manifest: TrainingManifest):
+        """Initializes the Curator with the given training manifest.
+
+        Args:
+            manifest: The training manifest configuration.
+        """
         self.manifest = manifest
         self.resolver = DataResolver()
         self.deduplicator = SemDeDup(threshold=self.manifest.dataset.dedup_threshold or 0.95)
 
     def prepare_dataset(self) -> List[Dict[str, Any]]:
-        """
-        Runs the full curation pipeline.
+        """Runs the full curation pipeline.
+
+        1. Resolves data from the URI (DataResolver).
+        2. Formats and validates data (DataFormatter).
+        3. Applies Semantic Deduplication if enabled (SemDeDup).
 
         Returns:
-            A list of formatted, deduped data ready for training.
+            List[Dict[str, Any]]: A list of formatted, deduped data dictionaries ready for training.
         """
         logger.info(f"Starting curation for job {self.manifest.job_id}")
 

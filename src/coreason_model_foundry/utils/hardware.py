@@ -20,9 +20,11 @@ class HardwareIncompatibleError(RuntimeError):
 
 
 def get_gpu_memory_info() -> Dict[int, float]:
-    """
-    Returns a dictionary mapping GPU device IDs to their total memory in GB.
-    Returns an empty dict if CUDA is not available.
+    """Retrieves total memory information for all available CUDA devices.
+
+    Returns:
+        Dict[int, float]: A dictionary mapping GPU device IDs to their total memory in GB.
+                          Returns an empty dict if CUDA is not available or torch is missing.
     """
     try:
         import torch
@@ -49,8 +51,9 @@ def get_gpu_memory_info() -> Dict[int, float]:
 
 
 def check_vram_compatibility(required_gb: float, device_id: int = 0) -> None:
-    """
-    Checks if the specified GPU has enough VRAM.
+    """Checks if the specified GPU has enough VRAM.
+
+    Compares the total physical memory of the device against the requirement.
 
     Args:
         required_gb: The minimum required VRAM in GB.

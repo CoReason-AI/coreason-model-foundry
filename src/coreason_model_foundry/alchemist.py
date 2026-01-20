@@ -20,20 +20,30 @@ from utils.logger import logger
 
 
 class Alchemist:
-    """
-    The Alchemist: Orchestrates model merging using mergekit.
+    """The Alchemist: Orchestrates model merging using mergekit.
+
+    This class serves as a wrapper around the `mergekit` CLI tool, generating
+    configurations and executing merge operations (specifically DARE-TIES) to
+    combine disparate model adapters into a unified artifact.
     """
 
     def merge(self, recipe: MergeRecipe, output_dir: Path) -> Path:
-        """
-        Executes the merge process based on the provided recipe.
+        """Executes the merge process based on the provided recipe.
+
+        Generates a temporary YAML configuration file for `mergekit` and executes
+        the merge command.
 
         Args:
-            recipe: The MergeRecipe configuration.
-            output_dir: The directory to save the merged model.
+            recipe: The MergeRecipe configuration object containing job details,
+                models, and parameters.
+            output_dir: The directory where the merged model artifacts will be saved.
 
         Returns:
-            The path to the output directory.
+            Path: The path to the output directory containing the merged model.
+
+        Raises:
+            RuntimeError: If the `mergekit` subprocess execution fails.
+            NotImplementedError: If the requested merge method is not supported.
         """
         logger.info(f"Initiating merge job {recipe.job_id} using {recipe.merge_method}")
 
@@ -56,15 +66,30 @@ class Alchemist:
         return output_dir
 
     def _build_config(self, recipe: MergeRecipe) -> Dict[str, Any]:
-        """Dispatches to the correct config builder."""
+        """Dispatches to the correct config builder based on the merge method.
+
+        Args:
+            recipe: The MergeRecipe configuration.
+
+        Returns:
+            Dict[str, Any]: A dictionary representing the mergekit configuration.
+
+        Raises:
+            NotImplementedError: If the merge method is not implemented.
+        """
         if recipe.merge_method == MergeMethod.DARE_TIES:
             return self._build_dare_ties_config(recipe)
         else:
             raise NotImplementedError(f"Merge method {recipe.merge_method} is not implemented.")
 
     def _build_dare_ties_config(self, recipe: MergeRecipe) -> Dict[str, Any]:
-        """
-        Constructs the mergekit YAML structure for DARE-TIES.
+        """Constructs the mergekit YAML structure for DARE-TIES.
+
+        Args:
+            recipe: The MergeRecipe configuration.
+
+        Returns:
+            Dict[str, Any]: The DARE-TIES specific configuration dictionary.
         """
         models_config = []
 
@@ -88,7 +113,15 @@ class Alchemist:
         }
 
     def _execute_mergekit(self, config_path: Path, output_dir: Path) -> None:
-        """Runs the mergekit-yaml command."""
+        """Runs the mergekit-yaml command via subprocess.
+
+        Args:
+            config_path: The path to the generated YAML configuration file.
+            output_dir: The directory where the output should be generated.
+
+        Raises:
+            RuntimeError: If the mergekit command fails.
+        """
         cmd = [
             "mergekit-yaml",
             str(config_path),

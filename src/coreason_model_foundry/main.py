@@ -25,14 +25,17 @@ from utils.logger import logger
 
 
 def load_manifest(manifest_path: str) -> TrainingManifest:
-    """
-    Loads and validates the Training Manifest from a YAML file.
+    """Loads and validates the Training Manifest from a YAML file.
 
     Args:
-        manifest_path: Path to the YAML file.
+        manifest_path: Path to the YAML file containing the training configuration.
 
     Returns:
-        Validated TrainingManifest object.
+        TrainingManifest: A Pydantic model representing the validated manifest.
+
+    Raises:
+        FileNotFoundError: If the manifest file does not exist.
+        ValueError: If the YAML content is invalid.
     """
     path = Path(manifest_path)
     if not path.exists():
@@ -47,16 +50,18 @@ def load_manifest(manifest_path: str) -> TrainingManifest:
 
 
 def calculate_provenance_id(manifest: TrainingManifest, dataset: List[Dict[str, Any]]) -> str:
-    """
-    Calculates the GxP Locking Hash (Provenance ID).
-    SHA256(dataset_content + manifest_content + base_model)
+    """Calculates the GxP Locking Hash (Provenance ID).
+
+    The hash is generated using SHA256 over the serialized manifest content and
+    the prepared dataset. This serves as a unique identifier for the training run,
+    ensuring traceability and compliance.
 
     Args:
-        manifest: The training manifest.
-        dataset: The prepared dataset.
+        manifest: The training manifest configuration.
+        dataset: The prepared dataset list of dictionaries.
 
     Returns:
-        Hex digest of the SHA256 hash.
+        str: The hex digest of the SHA256 hash.
     """
     logger.info("Calculating GxP Provenance ID...")
     hasher = hashlib.sha256()
@@ -80,21 +85,21 @@ def calculate_provenance_id(manifest: TrainingManifest, dataset: List[Dict[str, 
 
 
 def orchestrate_training(manifest_path: str) -> None:
-    """
-    The Crucible: Orchestrates the entire training workflow.
+    """The Crucible: Orchestrates the entire training workflow.
 
-    Pipeline:
+    Implements the core pipeline:
     1. Load Manifest
     2. Curate Data
-    3. GxP Lock
+    3. GxP Lock (Provenance Calculation)
     4. Select Strategy
     5. Execute Train
-    6. Distribute Artifacts
+    6. Distribute Artifacts (Publish)
 
     Args:
         manifest_path: Path to the training manifest YAML.
 
     Raises:
+        SystemExit: If the dataset is empty after curation.
         Exception: If any step in the workflow fails.
     """
     logger.info(f"Starting Crucible execution for {manifest_path}")

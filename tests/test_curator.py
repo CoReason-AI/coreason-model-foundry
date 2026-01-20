@@ -27,6 +27,7 @@ from coreason_model_foundry.schemas import (
 @pytest.fixture
 def base_manifest() -> TrainingManifest:
     return TrainingManifest(
+        publish_target=None,
         job_id="test-curator-job",
         base_model="test-model",
         method_config=MethodConfig(
@@ -37,7 +38,7 @@ def base_manifest() -> TrainingManifest:
             strict_hardware_check=False,
         ),
         dataset=DatasetConfig(ref="synthesis://tests/data/duplicates.json", sem_dedup=True, dedup_threshold=0.99),
-        compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024),
+        compute=ComputeConfig(quantization="4bit", batch_size=1, grad_accum=1, context_window=1024),
     )
 
 
