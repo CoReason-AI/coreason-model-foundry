@@ -15,32 +15,47 @@ from coreason_model_foundry.schemas import TrainingManifest
 
 
 class TrainingStrategy(ABC):
-    """
-    Abstract Base Class for training strategies.
+    """Abstract Base Class for training strategies.
 
-    This enforces the interface for different training kernels (QLoRA, DoRA, ORPO).
+    This class defines the interface for different training kernels (QLoRA, DoRA, ORPO),
+    enforcing a common structure for validation and execution.
     """
 
     def __init__(self, manifest: TrainingManifest):
+        """Initializes the TrainingStrategy with the given manifest.
+
+        Args:
+            manifest: The training manifest configuration.
+        """
         self.manifest = manifest
+
+    def validate_environment(self) -> None:
+        """Validates if the hardware environment meets the strategy requirements.
+
+        Can be overridden in subclasses for specific checks (e.g., VRAM limits).
+        """
+        # Default implementation does nothing
+        return
 
     @abstractmethod
     def validate(self) -> None:
-        """
-        Validates if the current environment and manifest are suitable for this strategy.
-        Raises exceptions if constraints are not met.
+        """Validates if the current environment and manifest are suitable for this strategy.
+
+        Should verify configuration consistency and call `self.validate_environment()`.
+
+        Raises:
+            Exception: If validation fails.
         """
         pass  # pragma: no cover
 
     @abstractmethod
     def train(self, train_dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Executes the training process.
+        """Executes the training process.
 
         Args:
             train_dataset: The processed dataset ready for training.
 
         Returns:
-            Dict containing artifacts paths or execution status.
+            Dict[str, Any]: Dictionary containing artifacts paths, metrics, or execution status.
         """
         pass  # pragma: no cover

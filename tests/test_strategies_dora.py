@@ -53,10 +53,17 @@ def mock_dependencies() -> Generator[None, None, None]:
 @pytest.fixture
 def dora_manifest() -> TrainingManifest:
     return TrainingManifest(
+        publish_target=None,
         job_id="test-job-001",
         base_model="meta-llama/Meta-Llama-3-8B",
-        method_config=MethodConfig(type=MethodType.DORA, rank=32, alpha=16, target_modules=["q_proj", "v_proj"]),
-        dataset=DatasetConfig(ref="synthesis://test_data", dedup_threshold=0.95),
+        method_config=MethodConfig(
+            type=MethodType.DORA,
+            rank=32,
+            alpha=16,
+            target_modules=["q_proj", "v_proj"],
+            strict_hardware_check=False,
+        ),
+        dataset=DatasetConfig(sem_dedup=False, ref="synthesis://test_data", dedup_threshold=0.95),
         compute=ComputeConfig(batch_size=2, grad_accum=1, context_window=1024, quantization="4bit"),
     )
 
