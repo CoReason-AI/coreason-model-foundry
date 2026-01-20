@@ -8,26 +8,32 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
+from pathlib import Path
+
 from utils.logger import logger
 
 
 class ArtifactPublisher:
-    """
-    Handles artifact publishing to the CoReason Registry.
-    Connects to coreason-publisher (or mock equivalent).
+    """Handles artifact publishing to the CoReason Registry.
+
+    Acts as the bridge to the `coreason-publisher` system, facilitating the upload
+    and versioning of trained model artifacts.
     """
 
     def publish_artifact(self, artifact_path: str, target_registry: str, tag: str) -> None:
-        """
-        Publishes the artifact to the specified registry.
+        """Publishes the artifact to the specified registry.
+
+        Initiates the upload of the local artifact (model directory or file) to the
+        target remote registry (e.g., S3) with the specified version tag.
 
         Args:
             artifact_path: Local path to the artifact (directory or file).
-            target_registry: URI of the target registry (e.g. s3://coreason-models/prod).
+            target_registry: URI of the target registry (e.g., s3://coreason-models/prod).
             tag: Version tag for the artifact.
 
         Raises:
-            RuntimeError: If publishing fails.
+            RuntimeError: If the publishing process encounters an error.
+            FileNotFoundError: If the artifact_path does not exist.
         """
         logger.info(f"Publishing artifact from {artifact_path} to {target_registry} with tag {tag}")
 
@@ -50,10 +56,16 @@ class ArtifactPublisher:
             raise RuntimeError(f"Publisher failed: {e}") from e
 
     def _mock_publish(self, path: str, registry: str, tag: str) -> None:
-        """Simulates the network call."""
-        # Here we might verify path exists
-        from pathlib import Path
+        """Simulates the network call for publishing artifacts.
 
+        Args:
+            path: Local path to the artifact.
+            registry: Target registry URI.
+            tag: Version tag.
+
+        Raises:
+            FileNotFoundError: If the artifact path does not exist.
+        """
         if not Path(path).exists():
             raise FileNotFoundError(f"Artifact not found at {path}")
 

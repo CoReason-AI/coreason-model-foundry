@@ -56,6 +56,7 @@ def test_orpo_cuda_query_exception() -> None:
 
     # Manifest
     manifest = TrainingManifest(
+        publish_target=None,
         job_id="test-job-orpo-cuda-err",
         base_model="meta-llama/Meta-Llama-3-8B",
         method_config=MethodConfig(
@@ -65,7 +66,7 @@ def test_orpo_cuda_query_exception() -> None:
             target_modules=["q_proj"],
             strict_hardware_check=True,
         ),
-        dataset=DatasetConfig(ref="synthesis://test", dedup_threshold=0.95),
+        dataset=DatasetConfig(sem_dedup=False, ref="synthesis://test", dedup_threshold=0.95),
         compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024, quantization="none"),
     )
 
@@ -96,6 +97,7 @@ def test_orpo_config_propagation() -> None:
 
     target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"]
     manifest = TrainingManifest(
+        publish_target=None,
         job_id="test-job-orpo-config",
         base_model="test-model-x",
         method_config=MethodConfig(
@@ -105,7 +107,7 @@ def test_orpo_config_propagation() -> None:
             target_modules=target_modules,
             strict_hardware_check=True,
         ),
-        dataset=DatasetConfig(ref="synthesis://test", dedup_threshold=0.95),
+        dataset=DatasetConfig(sem_dedup=False, ref="synthesis://test", dedup_threshold=0.95),
         compute=ComputeConfig(batch_size=4, grad_accum=2, context_window=4096, quantization="4bit"),
     )
 
@@ -147,12 +149,13 @@ def test_orpo_no_cuda_warning() -> None:
     mock_torch.cuda.is_available.return_value = False
 
     manifest = TrainingManifest(
+        publish_target=None,
         job_id="test-job-no-cuda",
         base_model="model",
         method_config=MethodConfig(
             type=MethodType.ORPO, rank=8, alpha=16, target_modules=["q"], strict_hardware_check=True
         ),
-        dataset=DatasetConfig(ref="synthesis://test", dedup_threshold=0.95),
+        dataset=DatasetConfig(sem_dedup=False, ref="synthesis://test", dedup_threshold=0.95),
         compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024, quantization="none"),
     )
 
@@ -172,6 +175,7 @@ def test_orpo_no_cuda_warning() -> None:
 def test_orpo_invalid_method_type() -> None:
     """Test validation raises ValueError if method type is not ORPO."""
     manifest = TrainingManifest(
+        publish_target=None,
         job_id="test-job-invalid",
         base_model="model",
         method_config=MethodConfig(
@@ -181,8 +185,8 @@ def test_orpo_invalid_method_type() -> None:
             target_modules=["q"],
             strict_hardware_check=True,
         ),
-        dataset=DatasetConfig(ref="synthesis://test", dedup_threshold=0.95),
-        compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024),
+        dataset=DatasetConfig(sem_dedup=False, ref="synthesis://test", dedup_threshold=0.95),
+        compute=ComputeConfig(quantization="4bit", batch_size=1, grad_accum=1, context_window=1024),
     )
 
     with patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", MagicMock()):
@@ -267,13 +271,14 @@ def test_orpo_import_error_torch() -> None:
 def test_orpo_unsloth_missing_validate() -> None:
     """Test validation fails if Unsloth is missing (FastLanguageModel is None)."""
     manifest = TrainingManifest(
+        publish_target=None,
         job_id="test-job-unsloth-missing",
         base_model="model",
         method_config=MethodConfig(
             type=MethodType.ORPO, rank=8, alpha=16, target_modules=["q"], strict_hardware_check=True
         ),
-        dataset=DatasetConfig(ref="synthesis://test", dedup_threshold=0.95),
-        compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024),
+        dataset=DatasetConfig(sem_dedup=False, ref="synthesis://test", dedup_threshold=0.95),
+        compute=ComputeConfig(quantization="4bit", batch_size=1, grad_accum=1, context_window=1024),
     )
 
     with patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", None):
@@ -287,13 +292,14 @@ def test_orpo_unsloth_missing_validate() -> None:
 def test_orpo_unsloth_missing_train() -> None:
     """Test training fails if Unsloth is missing (FastLanguageModel is None)."""
     manifest = TrainingManifest(
+        publish_target=None,
         job_id="test-job-unsloth-missing",
         base_model="model",
         method_config=MethodConfig(
             type=MethodType.ORPO, rank=8, alpha=16, target_modules=["q"], strict_hardware_check=True
         ),
-        dataset=DatasetConfig(ref="synthesis://test", dedup_threshold=0.95),
-        compute=ComputeConfig(batch_size=1, grad_accum=1, context_window=1024),
+        dataset=DatasetConfig(sem_dedup=False, ref="synthesis://test", dedup_threshold=0.95),
+        compute=ComputeConfig(quantization="4bit", batch_size=1, grad_accum=1, context_window=1024),
     )
 
     with patch("coreason_model_foundry.strategies.orpo.FastLanguageModel", None):

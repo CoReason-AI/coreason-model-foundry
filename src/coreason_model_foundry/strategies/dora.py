@@ -26,15 +26,15 @@ except ImportError:
 
 
 class DoRAStrategy(TrainingStrategy):
-    """
-    Implementation of DoRA (Weight-Decomposed Low-Rank Adaptation).
+    """Implementation of DoRA (Weight-Decomposed Low-Rank Adaptation).
 
-    Best for reasoning and logic tasks.
+    Best suited for logic and reasoning tasks. Utilizes Unsloth's `use_dora=True` parameter.
     """
 
     def validate(self) -> None:
-        """
-        Validates if the current environment and manifest are suitable for DoRA.
+        """Validates if the current environment and manifest are suitable for DoRA.
+
+        Checks if `unsloth` is installed.
 
         Raises:
             RuntimeError: If Unsloth is required but not installed.
@@ -48,18 +48,20 @@ class DoRAStrategy(TrainingStrategy):
         # so we assume if Unsloth is importable (or mocked), we proceed.
 
     def train(self, train_dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Executes DoRA Training.
+        """Executes DoRA Training.
+
+        Loads the model with Unsloth, applies DoRA adapters, converts data to Hugging Face
+        Dataset format, and runs the SFTTrainer.
 
         Args:
             train_dataset: The processed dataset ready for training.
 
         Returns:
-            Dict containing artifacts paths or execution status.
+            Dict[str, Any]: Dictionary containing artifacts paths and execution status.
 
         Raises:
             ValueError: If dataset is empty.
-            RuntimeError: If Unsloth is missing.
+            RuntimeError: If Unsloth is missing during execution.
         """
         logger.info(f"Initializing DoRA training for job {self.manifest.job_id}")
 
@@ -126,6 +128,7 @@ class DoRAStrategy(TrainingStrategy):
         )
 
         def formatting_prompts_func(examples: Dict[str, List[Any]]) -> List[str]:
+            """Formats the examples into the instruction prompt template."""
             instructions = examples["instruction"]
             inputs = examples["input"]
             outputs = examples["output"]
@@ -185,9 +188,10 @@ class DoRAStrategy(TrainingStrategy):
 
 # Helper for BF16 check (Mocked for now or standard torch check)
 def is_bfloat16_supported() -> bool:
+    """Checks if bfloat16 is supported on the current device."""
     try:
         import torch
 
-        return torch.cuda.is_available() and torch.cuda.is_bf16_supported()  # type: ignore
+        return bool(torch.cuda.is_available() and torch.cuda.is_bf16_supported())
     except Exception:
         return False

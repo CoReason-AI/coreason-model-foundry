@@ -2,27 +2,26 @@
 
 **Industrial Automation Engine for Training Specialized "Student Models"**
 
-[![License: Prosperity 3.0](https://img.shields.io/badge/License-Prosperity%203.0-blue)](https://prosperitylicense.com/versions/3.0.0)
+[![License: Prosperity 3.0](https://img.shields.io/badge/license-Prosperity%203.0-blue)](https://prosperitylicense.com/versions/3.0.0)
 [![CI](https://github.com/CoReason-AI/coreason-model-foundry/actions/workflows/ci.yml/badge.svg)](https://github.com/CoReason-AI/coreason-model-foundry/actions/workflows/ci.yml)
 [![Code Style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Documentation](https://img.shields.io/badge/docs-requirements-brightgreen)](docs/product_requirements.md)
 
 The **coreason-model-foundry** serves as the "Refinery" in the CoReason AI ecosystem. It is an orchestrator for post-training optimization, designed to select the right mathematical strategy (DoRA, ORPO, QLoRA) for the task, prune data for maximum information density, and distribute the resulting artifacts safely.
 
 It implements a **Select-Prune-Train-Merge-Distribute Loop**, utilizing `unsloth` for accelerated training and `mergekit` for model merging.
 
----
-
 ## Features
 
--   **Polymorphic Training:** dynamically selects the best training kernel:
-    -   **DoRA:** For Logic & Reasoning tasks.
-    -   **ORPO:** For Safety & Alignment tasks (requires Triplet data).
-    -   **QLoRA:** For memory-efficient fine-tuning.
--   **Data Curator:** Maximizes information density using Semantic Deduplication (`SemDeDup`) with `all-MiniLM-L6-v2`.
--   **Hardware Awareness:** "Fail Fast" mechanism prevents OOM crashes by pre-validating VRAM requirements (e.g., enforces 24GB for full ORPO).
--   **Automated Merging:** Integrates `mergekit` to combine adapters using the **DARE-TIES** algorithm.
--   **GxP Compliance:** Calculates provenance hashes (Lot Numbers) for datasets and manifests.
--   **Artifact Publishing:** Automatically pushes trained models to the CoReason registry.
+*   **Polymorphic Training Architecture:** Dynamically loads the training kernel based on the goal:
+    *   **DoRA:** Logic & Math (via `UnslothSFTTrainer`).
+    *   **ORPO:** Alignment & Safety (via `UnslothORPOTrainer`).
+    *   **QLoRA:** Memory Efficiency (via 4-bit quantization).
+*   **Data Curator:** Maximizes "Information Density" using Semantic Deduplication (`SemDeDup`) to remove 95%+ similar duplicates.
+*   **Hardware Safety:** "Fail Fast" mechanism prevents OOM crashes by validating VRAM requirements (e.g., enforces 24GB for full ORPO).
+*   **The Alchemist (Merging):** Integrates `mergekit` to combine adapters using the **DARE-TIES** algorithm.
+*   **Artifact Distribution:** Automatically pushes trained models to the `coreason-publisher` registry.
+*   **GxP Compliance:** Calculates provenance hashes (Lot Numbers) for datasets and manifests.
 
 ## Installation
 
@@ -34,20 +33,24 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Training with the Crucible
+### Python API
 
-Create a training manifest (`manifest.yaml`) and run the orchestrator:
+```python
+from coreason_model_foundry import orchestrate_training
+
+# Run the full training pipeline with a manifest file
+orchestrate_training("manifest.yaml")
+```
+
+### Example Manifest
 
 ```yaml
-# manifest.yaml
 job_id: "train-prod-2025-01-15"
 base_model: "unsloth/llama-3-8b-bnb-4bit"
 
 method_config:
   type: "orpo"
   rank: 64
-  alpha: 16
-  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
   strict_hardware_check: true
 
 dataset:
@@ -57,31 +60,4 @@ dataset:
 compute:
   batch_size: 4
   grad_accum: 4
-  context_window: 4096
-  quantization: "4bit"
-```
-
-**Python Usage:**
-
-```python
-from coreason_model_foundry import orchestrate_training
-
-# Run the full training pipeline
-orchestrate_training("manifest.yaml")
-```
-
-### Using the Strategy Factory Directly
-
-```python
-from coreason_model_foundry.main import load_manifest
-from coreason_model_foundry.strategies.factory import StrategyFactory
-
-manifest = load_manifest("manifest.yaml")
-strategy = StrategyFactory.get_strategy(manifest)
-
-# Validate environment and configuration
-strategy.validate()
-
-# Train (requires prepared dataset)
-# result = strategy.train(dataset)
 ```

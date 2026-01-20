@@ -57,12 +57,13 @@ def mock_dependencies() -> Generator[None, None, None]:
 @pytest.fixture
 def orpo_manifest() -> TrainingManifest:
     return TrainingManifest(
+        publish_target=None,
         job_id="test-job-orpo-001",
         base_model="meta-llama/Meta-Llama-3-8B",
         method_config=MethodConfig(
             type=MethodType.ORPO, rank=64, alpha=32, target_modules=["q_proj", "v_proj"], strict_hardware_check=True
         ),
-        dataset=DatasetConfig(ref="synthesis://test_orpo_data", dedup_threshold=0.95),
+        dataset=DatasetConfig(sem_dedup=False, ref="synthesis://test_orpo_data", dedup_threshold=0.95),
         compute=ComputeConfig(batch_size=2, grad_accum=1, context_window=2048, quantization="4bit"),
     )
 
