@@ -312,3 +312,72 @@ def test_qlora_torch_missing(qlora_manifest: TrainingManifest) -> None:
         # because (torch is None or not torch.cuda.is_available()) will be True
         with pytest.raises(EnvironmentError, match="QLoRA requires a GPU environment"):
             strategy.validate()
+
+
+def test_train_dataset_empty(qlora_manifest: TrainingManifest) -> None:
+    """Test that train raises ValueError when dataset is empty."""
+    from coreason_model_foundry.strategies.qlora import QLoRAStrategy
+
+    mock_torch = MagicMock()
+    mock_torch.cuda.is_available.return_value = True
+
+    with (
+        patch("coreason_model_foundry.strategies.qlora.FastLanguageModel"),
+        patch("coreason_model_foundry.strategies.qlora.torch", mock_torch),
+    ):
+        strategy = QLoRAStrategy(qlora_manifest)
+        # Calling train with empty list should raise ValueError
+        with pytest.raises(ValueError, match="Training dataset is empty"):
+            strategy.train([])
+
+
+def test_train_unsloth_missing_defensive_check(
+    qlora_manifest: TrainingManifest, sample_dataset: List[Dict[str, str]]
+) -> None:
+    """
+    Test the defensive check inside train() where FastLanguageModel is None.
+    This simulates a race condition or odd state where validate() passed (or was skipped)
+    but import failed before train().
+    """
+    from coreason_model_foundry.strategies.qlora import QLoRAStrategy
+
+    mock_torch = MagicMock()
+    mock_torch.cuda.is_available.return_value = True
+
+    # We patch FastLanguageModel to None inside the scope where we call train
+    with (
+        patch("coreason_model_foundry.strategies.qlora.FastLanguageModel", None),
+        patch("coreason_model_foundry.strategies.qlora.torch", mock_torch),
+    ):
+        strategy = QLoRAStrategy(qlora_manifest)
+        # We assume validate() is skipped or we simulate it passing somehow?
+        # If we call train() directly, we hit the check.
+        with pytest.raises(RuntimeError, match="Unsloth is required"):
+            strategy.train(sample_dataset)
+
+
+def test_is_bfloat16_supported_exception() -> None:
+    """Test that is_bfloat16_supported catches exceptions and returns False."""
+    from coreason_model_foundry.strategies.qlora import is_bfloat16_supported
+
+    # We need to ensure QLoRAStrategy imports torch to call the helper,
+    # but the helper imports torch internally.
+    # Wait, the helper imports torch inside `try/except`.
+    # So we need to mock `torch.cuda` to raise an Exception.
+
+    # We need to patch sys.modules['torch'] so that `import torch` inside the function uses our mock.
+    mock_torch = MagicMock()
+    mock_torch.cuda.is_available.side_effect = Exception("CUDA Error")
+
+    with patch.dict(sys.modules, {"torch": mock_torch}):
+        assert is_bfloat16_supported() is False
+
+    # Also test implicit import error (if import fails)
+    # If we ensure torch is NOT in sys.modules, and cannot be imported
+    with patch.dict(sys.modules):
+        if "torch" in sys.modules:
+            del sys.modules["torch"]
+        # We need a finder that raises ImportError, or just rely on the fact that it might not be there?
+        # Simpler to make the mock raise ImportError on access? No.
+        # Making the import fail is harder without manipulating builtins.
+        # But we covered the 'Exception' catch block above.
