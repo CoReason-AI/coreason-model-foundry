@@ -1,7 +1,8 @@
-loguru>=0.7.2
-pydantic>=2.7.0
-sentence-transformers>=3.0.0
-datasets>=2.19.0
-trl>=0.8.6
-pyyaml>=6.0.1
-mergekit>=0.0.1
+datasets
+loguru
+mergekit
+pydantic
+pyyaml
+sentence-transformers
+transformers
+trl

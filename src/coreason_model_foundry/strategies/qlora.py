@@ -30,15 +30,13 @@ except ImportError:
 
 
 class QLoRAStrategy(TrainingStrategy):
-    """
-    Implementation of QLoRA (Quantized Low-Rank Adaptation).
+    """Implementation of QLoRA (Quantized Low-Rank Adaptation).
 
-    Best for memory efficiency.
+    Best for memory efficiency. Enforces 4-bit quantization and CUDA availability.
     """
 
     def validate_environment(self) -> None:
-        """
-        Validates hardware constraints for QLoRA.
+        """Validates hardware constraints for QLoRA.
 
         Rule: Must run on GPU (CUDA available).
 
@@ -53,8 +51,7 @@ class QLoRAStrategy(TrainingStrategy):
             raise EnvironmentError(msg)
 
     def validate(self) -> None:
-        """
-        Validates if the current environment and manifest are suitable for this strategy.
+        """Validates if the current environment and manifest are suitable for this strategy.
 
         Raises:
             RuntimeError: If Unsloth is missing.
@@ -71,14 +68,13 @@ class QLoRAStrategy(TrainingStrategy):
         self.validate_environment()
 
     def train(self, train_dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Executes QLoRA Training.
+        """Executes QLoRA Training.
 
         Args:
             train_dataset: The processed dataset ready for training.
 
         Returns:
-            Dict containing artifacts paths or execution status.
+            Dict[str, Any]: Dictionary containing artifacts paths or execution status.
 
         Raises:
             ValueError: If dataset is empty.
@@ -153,6 +149,7 @@ class QLoRAStrategy(TrainingStrategy):
         )
 
         def formatting_prompts_func(examples: Dict[str, List[Any]]) -> List[str]:
+            """Formats the examples into the instruction prompt template."""
             instructions = examples["instruction"]
             inputs = examples["input"]
             outputs = examples["output"]
@@ -205,6 +202,7 @@ class QLoRAStrategy(TrainingStrategy):
 
 
 def is_bfloat16_supported() -> bool:
+    """Checks if bfloat16 is supported on the current device."""
     try:
         import torch
 
