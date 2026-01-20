@@ -19,6 +19,6 @@ __version__ = "0.1.0"
 __author__ = "Gowtham A Rao"
 __email__ = "gowtham.rao@coreason.ai"
 
-from .main import load_manifest, orchestrate_training
+from .service import ModelFoundryService, ModelFoundryServiceAsync
 
-__all__ = ["orchestrate_training", "load_manifest"]
+__all__ = ["ModelFoundryServiceAsync", "ModelFoundryService"]
