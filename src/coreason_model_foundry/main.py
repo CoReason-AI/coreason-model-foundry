@@ -83,11 +83,19 @@ def orchestrate_training(manifest_path: str) -> None:
     """
     The Crucible: Orchestrates the entire training workflow.
 
+    Pipeline:
     1. Load Manifest
     2. Curate Data
     3. GxP Lock
     4. Select Strategy
     5. Execute Train
+    6. Distribute Artifacts
+
+    Args:
+        manifest_path: Path to the training manifest YAML.
+
+    Raises:
+        Exception: If any step in the workflow fails.
     """
     logger.info(f"Starting Crucible execution for {manifest_path}")
 
