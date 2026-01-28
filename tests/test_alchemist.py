@@ -15,8 +15,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from coreason_identity.models import UserContext
+from coreason_identity.types import SecretStr
 from coreason_model_foundry.alchemist import Alchemist
 from coreason_model_foundry.schemas import MergeMethod, MergeRecipe, ModelEntry, ModelParameters
+
+
+@pytest.fixture
+def mock_context() -> UserContext:
+    return UserContext(user_id=SecretStr("test-user"), roles=["tester"])
 
 
 @pytest.fixture
@@ -52,14 +59,19 @@ class TestAlchemist:
     @patch("subprocess.run")
     @patch("torch.cuda.is_available", return_value=False)
     def test_merge_execution_success(
-        self, mock_cuda: MagicMock, mock_run: MagicMock, sample_recipe: MergeRecipe, tmp_path: Path
+        self,
+        mock_cuda: MagicMock,
+        mock_run: MagicMock,
+        sample_recipe: MergeRecipe,
+        tmp_path: Path,
+        mock_context: UserContext,
     ) -> None:
         """Test successful execution of the merge process."""
         alchemist = Alchemist()
         output_dir = tmp_path / "output"
 
         # Execute
-        result = alchemist.merge(sample_recipe, output_dir)
+        result = alchemist.merge(sample_recipe, output_dir, context=mock_context)
 
         assert result == output_dir
 
@@ -76,20 +88,27 @@ class TestAlchemist:
     @patch("subprocess.run")
     @patch("torch.cuda.is_available", return_value=True)
     def test_merge_execution_with_cuda(
-        self, mock_cuda: MagicMock, mock_run: MagicMock, sample_recipe: MergeRecipe, tmp_path: Path
+        self,
+        mock_cuda: MagicMock,
+        mock_run: MagicMock,
+        sample_recipe: MergeRecipe,
+        tmp_path: Path,
+        mock_context: UserContext,
     ) -> None:
         """Test execution with CUDA flag enabled."""
         alchemist = Alchemist()
         output_dir = tmp_path / "output"
 
-        alchemist.merge(sample_recipe, output_dir)
+        alchemist.merge(sample_recipe, output_dir, context=mock_context)
 
         args, _ = mock_run.call_args
         cmd = args[0]
         assert "--cuda" in cmd
 
     @patch("subprocess.run")
-    def test_merge_execution_failure(self, mock_run: MagicMock, sample_recipe: MergeRecipe, tmp_path: Path) -> None:
+    def test_merge_execution_failure(
+        self, mock_run: MagicMock, sample_recipe: MergeRecipe, tmp_path: Path, mock_context: UserContext
+    ) -> None:
         """Test that subprocess failure raises RuntimeError."""
         # Simulate failure
         mock_run.side_effect = subprocess.CalledProcessError(
@@ -100,7 +119,7 @@ class TestAlchemist:
         output_dir = tmp_path / "output"
 
         with pytest.raises(RuntimeError) as exc:
-            alchemist.merge(sample_recipe, output_dir)
+            alchemist.merge(sample_recipe, output_dir, context=mock_context)
 
         assert "Merge failed" in str(exc.value)
         assert "Some error occurred" in str(exc.value)
@@ -116,7 +135,7 @@ class TestAlchemist:
 
         assert "is not implemented" in str(exc.value)
 
-    def test_temp_file_cleanup(self, sample_recipe: MergeRecipe, tmp_path: Path) -> None:
+    def test_temp_file_cleanup(self, sample_recipe: MergeRecipe, tmp_path: Path, mock_context: UserContext) -> None:
         """Verify that the temporary config file is cleaned up."""
         alchemist = Alchemist()
         output_dir = tmp_path / "output"
@@ -124,13 +143,13 @@ class TestAlchemist:
         with patch("pathlib.Path.unlink") as mock_unlink:
             # We also need to mock subprocess so it doesn't actually run/fail
             with patch("subprocess.run"):
-                alchemist.merge(sample_recipe, output_dir)
+                alchemist.merge(sample_recipe, output_dir, context=mock_context)
 
             mock_unlink.assert_called_once()
 
     @patch("subprocess.run")
     def test_merge_execution_missing_torch(
-        self, mock_run: MagicMock, sample_recipe: MergeRecipe, tmp_path: Path
+        self, mock_run: MagicMock, sample_recipe: MergeRecipe, tmp_path: Path, mock_context: UserContext
     ) -> None:
         """Test execution when torch is not installed (ImportError coverage)."""
         alchemist = Alchemist()
@@ -138,7 +157,7 @@ class TestAlchemist:
 
         # Simulate missing torch
         with patch.dict(sys.modules, {"torch": None}):
-            alchemist.merge(sample_recipe, output_dir)
+            alchemist.merge(sample_recipe, output_dir, context=mock_context)
 
         # Verify command does NOT have --cuda, and no exception was raised during check
         args, _ = mock_run.call_args

@@ -12,6 +12,7 @@ import contextvars
 import hashlib
 import json
 import sys
+from functools import partial
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,8 @@ import httpx
 import yaml
 from anyio import to_thread
 
+from coreason_identity.models import UserContext
+from coreason_model_foundry.alchemist import Alchemist
 from coreason_model_foundry.curator.main import Curator
 from coreason_model_foundry.publisher import ArtifactPublisher
 from coreason_model_foundry.schemas import TrainingManifest
@@ -46,6 +49,7 @@ class ModelFoundryServiceAsync:
         self._internal_client = client is None
         self._client = client or httpx.AsyncClient()
         self._publisher = ArtifactPublisher()
+        self._alchemist = Alchemist()
 
     async def __aenter__(self) -> "ModelFoundryServiceAsync":
         return self
@@ -90,9 +94,14 @@ class ModelFoundryServiceAsync:
 
         return await to_thread.run_sync(_calc)
 
-    async def orchestrate_training(self, manifest_path: Path) -> None:
+    async def orchestrate_training(self, manifest_path: Path, *, context: UserContext) -> None:
         """Orchestrates the training workflow asynchronously."""
         logger.info(f"Starting Crucible execution for {manifest_path}")
+        logger.info(
+            "Initiating model training",
+            user_id=context.user_id.get_secret_value(),
+            dataset_path=str(manifest_path),
+        )
 
         try:
             # 1. Load Manifest
@@ -134,13 +143,15 @@ class ModelFoundryServiceAsync:
                     # Ideally we'd use self._client if publisher supported async.
                     # Current publisher is sync.
                     # Note: to_thread.run_sync calls the function with *args.
-                    # It seems `self._publisher.publish_artifact` is being called with positional args.
-                    await to_thread.run_sync(
+                    # We use partial to handle the keyword-only context argument.
+                    publish_func = partial(
                         self._publisher.publish_artifact,
                         output_dir,
                         manifest.publish_target.registry,
                         manifest.publish_target.tag,
+                        context=context,
                     )
+                    await to_thread.run_sync(publish_func)
                 else:
                     logger.warning("No output directory returned from strategy. Skipping publication.")
             else:
@@ -149,6 +160,38 @@ class ModelFoundryServiceAsync:
         except Exception as e:
             logger.exception("Crucible execution failed.")
             raise e
+
+    async def evaluate_model(self, model_path: Path, *, context: UserContext) -> None:
+        """Evaluates a model asynchronously.
+
+        Args:
+            model_path: Path to the model directory.
+            context: User context for auditing.
+        """
+        logger.info("Evaluating model", user_id=context.user_id.get_secret_value(), model=str(model_path))
+        # Placeholder: Connect to actual Examiner here when implemented
+        # e.g., self._examiner.evaluate(model_path)
+        logger.info("Model evaluation completed (simulated).")
+
+    async def publish_model(self, model_path: Path, registry: str, tag: str, *, context: UserContext) -> None:
+        """Publishes a model artifact asynchronously.
+
+        Args:
+            model_path: Path to the model directory.
+            registry: Target registry URI.
+            tag: Version tag.
+            context: User context for auditing.
+        """
+        logger.info("Publishing model", user_id=context.user_id.get_secret_value(), model=str(model_path))
+
+        publish_func = partial(
+            self._publisher.publish_artifact,
+            str(model_path),
+            registry,
+            tag,
+            context=context,
+        )
+        await to_thread.run_sync(publish_func)
 
 
 class ModelFoundryService:
@@ -171,8 +214,32 @@ class ModelFoundryService:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         anyio.run(self._async.__aexit__, exc_type, exc_val, exc_tb)
 
-    def orchestrate_training(self, manifest_path: Path | str) -> None:
+    def orchestrate_training(self, manifest_path: Path | str, *, context: UserContext) -> None:
         """Orchestrates training synchronously."""
         if isinstance(manifest_path, str):
             manifest_path = Path(manifest_path)
-        return anyio.run(self._async.orchestrate_training, manifest_path)
+
+        async def _wrapper() -> None:
+            await self._async.orchestrate_training(manifest_path, context=context)
+
+        return anyio.run(_wrapper)
+
+    def evaluate_model(self, model_path: Path | str, *, context: UserContext) -> None:
+        """Evaluates a model synchronously."""
+        if isinstance(model_path, str):
+            model_path = Path(model_path)
+
+        async def _wrapper() -> None:
+            await self._async.evaluate_model(model_path, context=context)
+
+        return anyio.run(_wrapper)
+
+    def publish_model(self, model_path: Path | str, registry: str, tag: str, *, context: UserContext) -> None:
+        """Publishes a model synchronously."""
+        if isinstance(model_path, str):
+            model_path = Path(model_path)
+
+        async def _wrapper() -> None:
+            await self._async.publish_model(model_path, registry, tag, context=context)
+
+        return anyio.run(_wrapper)
