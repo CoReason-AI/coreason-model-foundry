@@ -12,13 +12,19 @@ class MockModule(MagicMock):
 
 
 # Only mock if not present
-if "sentence_transformers" not in sys.modules:
+try:
+    import sentence_transformers  # noqa: F401
+except ImportError:
     sys.modules["sentence_transformers"] = MockModule()
 
-if "datasets" not in sys.modules:
+try:
+    import datasets  # noqa: F401
+except ImportError:
     sys.modules["datasets"] = MockModule()
 
-if "trl" not in sys.modules:
+try:
+    import trl  # noqa: F401
+except ImportError:
     sys.modules["trl"] = MockModule()
 
 # We might also need to mock torch if it's not installed
