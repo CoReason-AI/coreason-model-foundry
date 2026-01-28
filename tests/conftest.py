@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 class MockModule(MagicMock):
     @classmethod
-    def __getattr__(cls, name):
+    def __getattr__(cls, name: str) -> MagicMock:
         return MagicMock()
 
 
