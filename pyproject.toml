@@ -1,11 +1,14 @@
 [tool.poetry]
 name = "coreason_model_foundry"
-version = "0.1.0"
+version = "0.2.0"
 description = "coreason-model-foundry"
 authors = ["Gowtham A Rao <gowtham.rao@coreason.ai>"]
 license = "Prosperity-3.0"
 readme = "README.md"
-packages = [{include = "coreason_model_foundry", from = "src"}]
+packages = [
+    {include = "coreason_model_foundry", from = "src"},
+    {include = "coreason_identity", from = "src"},
+]
 
 [tool.poetry.dependencies]
 python = ">=3.12, <3.15"
@@ -15,8 +18,8 @@ sentence-transformers = "^5.2.0"
 datasets = "^4.4.2"
 trl = "^0.26.2"
 pyyaml = "^6.0.3"
-anyio = "^4.3.0"
-httpx = "^0.27.0"
+anyio = "^4.12.1"
+httpx = "^0.28.1"
 aiofiles = "^23.2.1"
 
 [tool.poetry.group.dev.dependencies]
@@ -38,7 +41,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "coreason_model_foundry"
-version = "0.1.0"
+version = "0.2.0"
 description = "coreason-model-foundry"
 readme = "README.md"
 requires-python = ">=3.11"
