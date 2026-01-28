@@ -15,6 +15,7 @@ from typing import Any, Dict
 
 import yaml
 
+from coreason_identity.models import UserContext
 from coreason_model_foundry.schemas import MergeMethod, MergeRecipe
 from utils.logger import logger
 
@@ -27,7 +28,7 @@ class Alchemist:
     combine disparate model adapters into a unified artifact.
     """
 
-    def merge(self, recipe: MergeRecipe, output_dir: Path) -> Path:
+    def merge(self, recipe: MergeRecipe, output_dir: Path, *, context: UserContext) -> Path:
         """Executes the merge process based on the provided recipe.
 
         Generates a temporary YAML configuration file for `mergekit` and executes
@@ -37,6 +38,7 @@ class Alchemist:
             recipe: The MergeRecipe configuration object containing job details,
                 models, and parameters.
             output_dir: The directory where the merged model artifacts will be saved.
+            context: The user context initiating the merge.
 
         Returns:
             Path: The path to the output directory containing the merged model.
@@ -46,6 +48,11 @@ class Alchemist:
             NotImplementedError: If the requested merge method is not supported.
         """
         logger.info(f"Initiating merge job {recipe.job_id} using {recipe.merge_method}")
+        logger.info(
+            "Starting merge process",
+            user_id=context.user_id.get_secret_value(),
+            job_id=recipe.job_id,
+        )
 
         # 1. Build Config
         config_data = self._build_config(recipe)

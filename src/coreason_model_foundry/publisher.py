@@ -9,7 +9,9 @@
 # Source Code: https://github.com/CoReason-AI/coreason_model_foundry
 
 from pathlib import Path
+from typing import Any, Dict
 
+from coreason_identity.models import UserContext
 from utils.logger import logger
 
 
@@ -20,7 +22,7 @@ class ArtifactPublisher:
     and versioning of trained model artifacts.
     """
 
-    def publish_artifact(self, artifact_path: str, target_registry: str, tag: str) -> None:
+    def publish_artifact(self, artifact_path: str, target_registry: str, tag: str, *, context: UserContext) -> None:
         """Publishes the artifact to the specified registry.
 
         Initiates the upload of the local artifact (model directory or file) to the
@@ -30,6 +32,7 @@ class ArtifactPublisher:
             artifact_path: Local path to the artifact (directory or file).
             target_registry: URI of the target registry (e.g., s3://coreason-models/prod).
             tag: Version tag for the artifact.
+            context: The user context initiating the publish.
 
         Raises:
             RuntimeError: If the publishing process encounters an error.
@@ -46,8 +49,10 @@ class ArtifactPublisher:
             # This satisfies the requirement "Foundry calls publisher.push_artifact" logic
             # where we are the Foundry component implementing the call.
 
+            metadata = {"owner_id": context.user_id.get_secret_value()}
+
             # Mock Implementation
-            self._mock_publish(artifact_path, target_registry, tag)
+            self._mock_publish(artifact_path, target_registry, tag, metadata)
 
             logger.info("Artifact published successfully.")
 
@@ -55,13 +60,14 @@ class ArtifactPublisher:
             logger.error(f"Failed to publish artifact: {e}")
             raise RuntimeError(f"Publisher failed: {e}") from e
 
-    def _mock_publish(self, path: str, registry: str, tag: str) -> None:
+    def _mock_publish(self, path: str, registry: str, tag: str, metadata: Dict[str, Any]) -> None:
         """Simulates the network call for publishing artifacts.
 
         Args:
             path: Local path to the artifact.
             registry: Target registry URI.
             tag: Version tag.
+            metadata: Metadata to attach to the artifact.
 
         Raises:
             FileNotFoundError: If the artifact path does not exist.
@@ -69,4 +75,4 @@ class ArtifactPublisher:
         if not Path(path).exists():
             raise FileNotFoundError(f"Artifact not found at {path}")
 
-        logger.debug(f"[MOCK] Pushing {path} -> {registry}:{tag}")
+        logger.debug(f"[MOCK] Pushing {path} -> {registry}:{tag} | Metadata: {metadata}")
